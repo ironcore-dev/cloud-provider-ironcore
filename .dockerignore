@@ -1,0 +1,5 @@
+bin/
+testbin/
+config/
+.idea/
+*.iml
