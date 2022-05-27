@@ -2,12 +2,23 @@ package onmetal
 
 import (
 	"io"
+	"log"
+	"time"
 
+	onmetalapi "github.com/onmetal/onmetal-api/generated/clientset/versioned"
 	"github.com/pkg/errors"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/tools/cache"
 	cloudprovider "k8s.io/cloud-provider"
 )
 
 type onmetalCloudProvider struct {
+	loadBalancer cloudprovider.LoadBalancer
+	instances    cloudprovider.Instances
+	instancesV2  cloudprovider.InstancesV2
+	clusters     cloudprovider.Clusters
+	routes       cloudprovider.Routes
+	zones        cloudprovider.Zones
 }
 
 func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
@@ -19,10 +30,42 @@ func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
 }
 
 func newCloudProvider(config *onmetalCloudProviderConfig) (cloudprovider.Interface, error) {
-	return &onmetalCloudProvider{}, nil
+	onmetalClientSet, err := onmetalapi.NewForConfig(config.restConfig)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to get onmetal clientset")
+	}
+	loadBalancer := newOnmetalLoadBalancer(onmetalClientSet)
+	instances := newOnmetalInstances(onmetalClientSet)
+	instancesV2 := newOnmetalInstancesV2(onmetalClientSet)
+	clusters := newOnmetalClusters(onmetalClientSet)
+	routes := newOnmetalRoutes(onmetalClientSet)
+	zones := newOnmetalZones(onmetalClientSet)
+	return &onmetalCloudProvider{
+		loadBalancer: loadBalancer,
+		instances:    instances,
+		instancesV2:  instancesV2,
+		clusters:     clusters,
+		routes:       routes,
+		zones:        zones,
+	}, nil
 }
 
 func (o *onmetalCloudProvider) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+	clientset := clientBuilder.ClientOrDie("cloud-provider-onmetal")
+
+	informerFactory := informers.NewSharedInformerFactory(clientset, time.Second*30)
+	serviceInformer := informerFactory.Core().V1().Services()
+	nodeInformer := informerFactory.Core().V1().Nodes()
+
+	go serviceInformer.Informer().Run(stop)
+	go nodeInformer.Informer().Run(stop)
+
+	if !cache.WaitForCacheSync(stop, serviceInformer.Informer().HasSynced) {
+		log.Fatal("Timed out waiting for caches to sync")
+	}
+	if !cache.WaitForCacheSync(stop, nodeInformer.Informer().HasSynced) {
+		log.Fatal("Timed out waiting for caches to sync")
+	}
 }
 
 func (o *onmetalCloudProvider) LoadBalancer() (cloudprovider.LoadBalancer, bool) {

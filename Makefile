@@ -1,4 +1,4 @@
-BIN_NAME = "cloud-controller-manager"
+BIN_NAME = "cloud-provider-onmetal"
 
 IMG ?= cloud-provider-onmetal:latest
 

@@ -3,15 +3,19 @@ package onmetal
 import (
 	"context"
 
+	onmetalapi "github.com/onmetal/onmetal-api/generated/clientset/versioned"
 	v1 "k8s.io/api/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
 )
 
 type onmetalLoadBalancer struct {
+	clientSet *onmetalapi.Clientset
 }
 
-func newOnmetalLoadBalancer() cloudprovider.LoadBalancer {
-	return &onmetalLoadBalancer{}
+func newOnmetalLoadBalancer(clientSet *onmetalapi.Clientset) cloudprovider.LoadBalancer {
+	return &onmetalLoadBalancer{
+		clientSet: clientSet,
+	}
 }
 
 func (o *onmetalLoadBalancer) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
