@@ -35,8 +35,8 @@ func newCloudProvider(config *onmetalCloudProviderConfig) (cloudprovider.Interfa
 		return nil, errors.Wrap(err, "unable to get onmetal clientset")
 	}
 	loadBalancer := newOnmetalLoadBalancer(onmetalClientSet)
-	instances := newOnmetalInstances(onmetalClientSet)
-	instancesV2 := newOnmetalInstancesV2(onmetalClientSet)
+	instances := newOnmetalInstances(onmetalClientSet, config.namespace)
+	instancesV2 := newOnmetalInstancesV2(onmetalClientSet, config.namespace)
 	clusters := newOnmetalClusters(onmetalClientSet)
 	routes := newOnmetalRoutes(onmetalClientSet)
 	zones := newOnmetalZones(onmetalClientSet)
@@ -73,7 +73,7 @@ func (o *onmetalCloudProvider) LoadBalancer() (cloudprovider.LoadBalancer, bool)
 }
 
 func (o *onmetalCloudProvider) Instances() (cloudprovider.Instances, bool) {
-	return nil, false
+	return o.instances, true
 }
 
 func (o *onmetalCloudProvider) InstancesV2() (cloudprovider.InstancesV2, bool) {

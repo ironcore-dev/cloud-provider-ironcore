@@ -14,16 +14,18 @@ import (
 
 type onmetalInstancesV2 struct {
 	clientSet *onmetalapi.Clientset
+	namespace string
 }
 
-func newOnmetalInstancesV2(clientSet *onmetalapi.Clientset) cloudprovider.InstancesV2 {
+func newOnmetalInstancesV2(clientSet *onmetalapi.Clientset, namespace string) cloudprovider.InstancesV2 {
 	return &onmetalInstancesV2{
 		clientSet: clientSet,
+		namespace: namespace,
 	}
 }
 
 func (o *onmetalInstancesV2) InstanceExists(ctx context.Context, node *corev1.Node) (bool, error) {
-	_, err := o.clientSet.ComputeV1alpha1().Machines("").Get(ctx, node.Name, metav1.GetOptions{})
+	_, err := o.clientSet.ComputeV1alpha1().Machines(o.namespace).Get(ctx, node.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return false, nil
 	}
@@ -34,7 +36,7 @@ func (o *onmetalInstancesV2) InstanceExists(ctx context.Context, node *corev1.No
 }
 
 func (o *onmetalInstancesV2) InstanceShutdown(ctx context.Context, node *corev1.Node) (bool, error) {
-	machine, err := o.clientSet.ComputeV1alpha1().Machines("").Get(ctx, node.Name, metav1.GetOptions{})
+	machine, err := o.clientSet.ComputeV1alpha1().Machines(o.namespace).Get(ctx, node.Name, metav1.GetOptions{})
 	if err != nil {
 		return false, errors.Wrap(err, "unable to get machine")
 	}
@@ -43,7 +45,7 @@ func (o *onmetalInstancesV2) InstanceShutdown(ctx context.Context, node *corev1.
 }
 
 func (o *onmetalInstancesV2) InstanceMetadata(ctx context.Context, node *corev1.Node) (*cloudprovider.InstanceMetadata, error) {
-	machine, err := o.clientSet.ComputeV1alpha1().Machines("").Get(ctx, node.Name, metav1.GetOptions{})
+	machine, err := o.clientSet.ComputeV1alpha1().Machines(o.namespace).Get(ctx, node.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get machine")
 	}

@@ -11,6 +11,7 @@ import (
 
 type onmetalCloudProviderConfig struct {
 	restConfig *rest.Config
+	namespace  string
 }
 
 func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
@@ -19,6 +20,12 @@ func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
 		return nil, errors.Wrap(err, "unable to read in config")
 	}
 	kubeConfig, err := clientcmd.Load(configBytes)
+	currentContextName := kubeConfig.CurrentContext
+	currentContext, ok := kubeConfig.Contexts[currentContextName]
+	if !ok {
+		return nil, errors.Wrap(err, "default context in kubeconfig is not set, don't know which namespace to use")
+	}
+	namespace := currentContext.Namespace
 	clientConfig := clientcmd.NewDefaultClientConfig(*kubeConfig, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to serialize kubeconfig")
@@ -29,5 +36,6 @@ func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
 	}
 	return &onmetalCloudProviderConfig{
 		restConfig: restConfig,
+		namespace:  namespace,
 	}, nil
 }

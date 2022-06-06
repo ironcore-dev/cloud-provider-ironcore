@@ -16,17 +16,18 @@ import (
 
 type onmetalInstances struct {
 	clientSet *onmetalapi.Clientset
+	namespace string
 }
 
-func newOnmetalInstances(clientSet *onmetalapi.Clientset) cloudprovider.Instances {
+func newOnmetalInstances(clientSet *onmetalapi.Clientset, namespace string) cloudprovider.Instances {
 	return &onmetalInstances{
 		clientSet: clientSet,
+		namespace: namespace,
 	}
 }
 
 func (o *onmetalInstances) NodeAddresses(ctx context.Context, name types.NodeName) ([]corev1.NodeAddress, error) {
-	// TODO understand how to extract namespace for the clientset (maybe get from default kubeconfig context)
-	machine, err := o.clientSet.ComputeV1alpha1().Machines("").Get(ctx, string(name), metav1.GetOptions{})
+	machine, err := o.clientSet.ComputeV1alpha1().Machines(o.namespace).Get(ctx, string(name), metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get machine")
 	}
@@ -58,7 +59,7 @@ func (o *onmetalInstances) InstanceID(_ context.Context, nodeName types.NodeName
 }
 
 func (o *onmetalInstances) InstanceType(ctx context.Context, nodeName types.NodeName) (string, error) {
-	machine, err := o.clientSet.ComputeV1alpha1().Machines("").Get(ctx, string(nodeName), metav1.GetOptions{})
+	machine, err := o.clientSet.ComputeV1alpha1().Machines(o.namespace).Get(ctx, string(nodeName), metav1.GetOptions{})
 	if err != nil {
 		return "", errors.Wrap(err, "unable to get machine")
 	}
@@ -79,7 +80,7 @@ func (o *onmetalInstances) CurrentNodeName(_ context.Context, hostName string) (
 
 func (o *onmetalInstances) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	nodeName := nodeNameFromProviderID(providerID)
-	_, err := o.clientSet.ComputeV1alpha1().Machines("").Get(ctx, nodeName, metav1.GetOptions{})
+	_, err := o.clientSet.ComputeV1alpha1().Machines(o.namespace).Get(ctx, nodeName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return false, nil
 	}
@@ -91,7 +92,7 @@ func (o *onmetalInstances) InstanceExistsByProviderID(ctx context.Context, provi
 
 func (o *onmetalInstances) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
 	nodeName := nodeNameFromProviderID(providerID)
-	machine, err := o.clientSet.ComputeV1alpha1().Machines("").Get(ctx, nodeName, metav1.GetOptions{})
+	machine, err := o.clientSet.ComputeV1alpha1().Machines(o.namespace).Get(ctx, nodeName, metav1.GetOptions{})
 	if err != nil {
 		return false, errors.Wrap(err, "unable to get machine")
 	}

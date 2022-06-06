@@ -1,6 +1,5 @@
 BIN_NAME = "cloud-provider-onmetal"
-
-IMG ?= cloud-provider-onmetal:latest
+IMG ?= localhost:5000/cloud-provider-onmetal:latest
 
 GOPRIVATE ?= "github.com/onmetal/*"
 
@@ -31,11 +30,11 @@ vet:
 .PHONY: docker-build
 # Build the docker image
 docker-build:
-	docker build . -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG) --build-arg GOPRIVATE=$(GOPRIVATE)
+	DOCKER_BUILDKIT=1 docker build . -t $(IMG) --build-arg GOPRIVATE=$(GOPRIVATE)
 
 .PHONY: docker-push
 docker-push:
-	docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
+	docker push $(IMG)
 
 .PHONY: clean
 clean:
