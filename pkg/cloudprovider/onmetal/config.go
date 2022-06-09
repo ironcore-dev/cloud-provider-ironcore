@@ -20,6 +20,9 @@ func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
 		return nil, errors.Wrap(err, "unable to read in config")
 	}
 	kubeConfig, err := clientcmd.Load(configBytes)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to read kubeconfig")
+	}
 	currentContextName := kubeConfig.CurrentContext
 	currentContext, ok := kubeConfig.Contexts[currentContextName]
 	if !ok {

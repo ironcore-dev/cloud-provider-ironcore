@@ -28,17 +28,20 @@ func newOnmetalInstances(clientSet *onmetalapi.Clientset, namespace string) clou
 
 func (o *onmetalInstances) NodeAddresses(ctx context.Context, name types.NodeName) ([]corev1.NodeAddress, error) {
 	machine, err := o.clientSet.ComputeV1alpha1().Machines(o.namespace).Get(ctx, string(name), metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil, cloudprovider.InstanceNotFound
+	}
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get machine")
 	}
 	addresses := make([]corev1.NodeAddress, 0)
 	for _, iface := range machine.Status.NetworkInterfaces {
-		virtualIP := iface.VirtualIP.String()
-		// TODO understand how to differentiate addresses
-		addresses = append(addresses, corev1.NodeAddress{
-			Type:    corev1.NodeInternalIP,
-			Address: virtualIP,
-		})
+		if iface.VirtualIP != nil {
+			addresses = append(addresses, corev1.NodeAddress{
+				Type:    corev1.NodeExternalIP,
+				Address: iface.VirtualIP.String(),
+			})
+		}
 		for _, ip := range iface.IPs {
 			ip := ip.String()
 			addresses = append(addresses, corev1.NodeAddress{
@@ -47,6 +50,10 @@ func (o *onmetalInstances) NodeAddresses(ctx context.Context, name types.NodeNam
 			})
 		}
 	}
+	addresses = append(addresses, corev1.NodeAddress{
+		Type:    corev1.NodeHostName,
+		Address: machine.Name,
+	})
 	return addresses, nil
 }
 
@@ -54,12 +61,23 @@ func (o *onmetalInstances) NodeAddressesByProviderID(ctx context.Context, provid
 	return o.NodeAddresses(ctx, types.NodeName(nodeNameFromProviderID(providerID)))
 }
 
-func (o *onmetalInstances) InstanceID(_ context.Context, nodeName types.NodeName) (string, error) {
-	return string(nodeName), nil
+func (o *onmetalInstances) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
+	machine, err := o.clientSet.ComputeV1alpha1().Machines(o.namespace).Get(ctx, string(nodeName), metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return "", cloudprovider.InstanceNotFound
+	}
+	if err != nil {
+		return "", errors.Wrap(err, "unable to get machine")
+	}
+	// TODO assume that name format would be namespace__real-name
+	return machine.Name, nil
 }
 
 func (o *onmetalInstances) InstanceType(ctx context.Context, nodeName types.NodeName) (string, error) {
 	machine, err := o.clientSet.ComputeV1alpha1().Machines(o.namespace).Get(ctx, string(nodeName), metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return "", cloudprovider.InstanceNotFound
+	}
 	if err != nil {
 		return "", errors.Wrap(err, "unable to get machine")
 	}
@@ -93,6 +111,9 @@ func (o *onmetalInstances) InstanceExistsByProviderID(ctx context.Context, provi
 func (o *onmetalInstances) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
 	nodeName := nodeNameFromProviderID(providerID)
 	machine, err := o.clientSet.ComputeV1alpha1().Machines(o.namespace).Get(ctx, nodeName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		return false, nil
+	}
 	if err != nil {
 		return false, errors.Wrap(err, "unable to get machine")
 	}

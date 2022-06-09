@@ -9,6 +9,7 @@ import (
 	networkingv1alpha1 "github.com/onmetal/onmetal-api/apis/networking/v1alpha1"
 	onmetalapi "github.com/onmetal/onmetal-api/generated/clientset/versioned"
 	"k8s.io/apimachinery/pkg/types"
+	cloudprovider "k8s.io/cloud-provider"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -78,6 +79,8 @@ var _ = Describe("Instances", func() {
 			}
 			Expect(k8sClient.Create(ctx, network)).To(Succeed())
 
+			nodeIpString := "10.0.0.1"
+
 			By("creating a machine")
 			machine := &computev1alpha1.Machine{
 				ObjectMeta: metav1.ObjectMeta{
@@ -95,31 +98,14 @@ var _ = Describe("Instances", func() {
 									NetworkInterfaceTemplate: &networkingv1alpha1.NetworkInterfaceTemplateSpec{
 										Spec: networkingv1alpha1.NetworkInterfaceSpec{
 											NetworkRef: corev1.LocalObjectReference{Name: network.Name},
-											IPs:        []networkingv1alpha1.IPSource{{Value: commonv1alpha1.MustParseNewIP("10.0.0.1")}},
+											IPs:        []networkingv1alpha1.IPSource{{Value: commonv1alpha1.MustParseNewIP(nodeIpString)}},
 										},
 									},
 								},
 							},
 						},
 					},
-					Volumes: []computev1alpha1.Volume{
-						// {
-						// 	Name: "volume",
-						// 	VolumeSource: computev1alpha1.VolumeSource{
-						// 		Ephemeral: &computev1alpha1.EphemeralVolumeSource{
-						// 			VolumeTemplate: &storagev1alpha1.VolumeTemplateSpec{
-						// 				Spec: storagev1alpha1.VolumeSpec{
-						// 					VolumeClassRef: corev1.LocalObjectReference{Name: "my-class"},
-						// 					VolumePoolRef:  &corev1.LocalObjectReference{Name: "my-pool"},
-						// 					Resources: corev1.ResourceList{
-						// 						"storage": resource.MustParse("10Gi"),
-						// 					},
-						// 				},
-						// 			},
-						// 		},
-						// 	},
-						// },
-					},
+					Volumes: []computev1alpha1.Volume{},
 				},
 			}
 			Expect(k8sClient.Create(ctx, machine)).To(Succeed())
@@ -129,9 +115,44 @@ var _ = Describe("Instances", func() {
 
 			instances := newOnmetalInstances(onmetalClientSet, Namespace)
 
+			addresses, err := instances.NodeAddresses(ctx, types.NodeName(machine.Name))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(addresses).To(HaveLen(1))
+			Expect(addresses).To(ContainElements(corev1.NodeAddress{
+				Type:    corev1.NodeHostName,
+				Address: machine.Name,
+			}))
+
+			addresses, err = instances.NodeAddressesByProviderID(ctx, CDefaultCloudProviderName+"://"+machine.Name)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(addresses).To(HaveLen(1))
+			Expect(addresses).To(ContainElements(corev1.NodeAddress{
+				Type:    corev1.NodeHostName,
+				Address: machine.Name,
+			}))
+
 			nodeName, err := instances.InstanceID(ctx, types.NodeName(machine.Name))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(nodeName).To(Equal(machine.Name))
+
+			instanceType, err := instances.InstanceType(ctx, types.NodeName(machine.Name))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(instanceType).To(Equal(machine.Spec.MachineClassRef.Name))
+
+			err = instances.AddSSHKeyToAllInstances(ctx, "", []byte{})
+			Expect(err).To(Equal(cloudprovider.NotImplemented))
+
+			nodeNameTyped, err := instances.CurrentNodeName(ctx, machine.Name)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(nodeNameTyped).To(Equal(types.NodeName(machine.Name)))
+
+			exists, err := instances.InstanceExistsByProviderID(ctx, CDefaultCloudProviderName+"://"+machine.Name)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(exists).To(BeTrue())
+
+			shutdown, err := instances.InstanceShutdownByProviderID(ctx, CDefaultCloudProviderName+"://"+machine.Name)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(shutdown).To(BeFalse())
 		})
 	})
 })
