@@ -5,11 +5,17 @@ import (
 	"log"
 	"time"
 
+	computev1alpha1 "github.com/onmetal/onmetal-api/apis/compute/v1alpha1"
+	ipamv1alpha1 "github.com/onmetal/onmetal-api/apis/ipam/v1alpha1"
+	networkingv1alpha1 "github.com/onmetal/onmetal-api/apis/networking/v1alpha1"
+	storagev1alpha1 "github.com/onmetal/onmetal-api/apis/storage/v1alpha1"
 	onmetalapi "github.com/onmetal/onmetal-api/generated/clientset/versioned"
 	"github.com/pkg/errors"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	cloudprovider "k8s.io/cloud-provider"
+	clusterapiv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 type onmetalCloudProvider struct {
@@ -30,6 +36,22 @@ func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
 }
 
 func newCloudProvider(config *onmetalCloudProviderConfig) (cloudprovider.Interface, error) {
+	if err := computev1alpha1.AddToScheme(scheme.Scheme); err != nil {
+		return nil, errors.Wrap(err, "unable to add onmetal compute api to scheme")
+	}
+	if err := storagev1alpha1.AddToScheme(scheme.Scheme); err != nil {
+		return nil, errors.Wrap(err, "unable to add onmetal storage api to scheme")
+	}
+	if err := ipamv1alpha1.AddToScheme(scheme.Scheme); err != nil {
+		return nil, errors.Wrap(err, "unable to add onmetal ipam api to scheme")
+	}
+	if err := networkingv1alpha1.AddToScheme(scheme.Scheme); err != nil {
+		return nil, errors.Wrap(err, "unable to add onmetal networking api to scheme")
+	}
+	if err := clusterapiv1beta1.AddToScheme(scheme.Scheme); err != nil {
+		return nil, errors.Wrap(err, "unable to add cluster-api api to scheme")
+	}
+
 	onmetalClientSet, err := onmetalapi.NewForConfig(config.restConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get onmetal clientset")
@@ -37,7 +59,7 @@ func newCloudProvider(config *onmetalCloudProviderConfig) (cloudprovider.Interfa
 	loadBalancer := newOnmetalLoadBalancer(onmetalClientSet)
 	instances := newOnmetalInstances(onmetalClientSet, config.namespace)
 	instancesV2 := newOnmetalInstancesV2(onmetalClientSet, config.namespace)
-	clusters := newOnmetalClusters(onmetalClientSet)
+	clusters := newOnmetalClusters(onmetalClientSet, config.namespace)
 	routes := newOnmetalRoutes(onmetalClientSet)
 	zones := newOnmetalZones(onmetalClientSet)
 	return &onmetalCloudProvider{
@@ -51,6 +73,7 @@ func newCloudProvider(config *onmetalCloudProviderConfig) (cloudprovider.Interfa
 }
 
 func (o *onmetalCloudProvider) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+
 	clientset := clientBuilder.ClientOrDie("cloud-provider-onmetal")
 
 	informerFactory := informers.NewSharedInformerFactory(clientset, time.Second*30)
@@ -85,7 +108,7 @@ func (o *onmetalCloudProvider) Zones() (cloudprovider.Zones, bool) {
 }
 
 func (o *onmetalCloudProvider) Clusters() (cloudprovider.Clusters, bool) {
-	return nil, false
+	return o.clusters, true
 }
 
 func (o *onmetalCloudProvider) Routes() (cloudprovider.Routes, bool) {
