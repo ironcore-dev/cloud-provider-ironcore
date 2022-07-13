@@ -8,11 +8,11 @@ require (
 	github.com/onsi/gomega v1.19.0
 	github.com/pkg/errors v0.9.1
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
-	k8s.io/api v0.24.0
-	k8s.io/apimachinery v0.24.0
-	k8s.io/client-go v0.24.0
-	k8s.io/cloud-provider v0.24.0
-	k8s.io/component-base v0.24.0
+	k8s.io/api v0.24.2
+	k8s.io/apimachinery v0.24.2
+	k8s.io/client-go v0.24.2
+	k8s.io/cloud-provider v0.24.2
+	k8s.io/component-base v0.24.2
 	k8s.io/klog/v2 v2.60.1
 	sigs.k8s.io/cluster-api v1.1.4
 	sigs.k8s.io/controller-runtime v0.12.0
@@ -104,9 +104,9 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 	inet.af/netaddr v0.0.0-20210903134321-85fa6c94624e // indirect
 	k8s.io/apiextensions-apiserver v0.24.0 // indirect
-	k8s.io/apiserver v0.24.0 // indirect
-	k8s.io/component-helpers v0.24.0 // indirect
-	k8s.io/controller-manager v0.24.0 // indirect
+	k8s.io/apiserver v0.24.2 // indirect
+	k8s.io/component-helpers v0.24.2 // indirect
+	k8s.io/controller-manager v0.24.2 // indirect
 	k8s.io/kube-aggregator v0.24.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42 // indirect
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9 // indirect
