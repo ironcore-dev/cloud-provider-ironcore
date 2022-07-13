@@ -8,11 +8,11 @@ require (
 	github.com/onsi/gomega v1.19.0
 	github.com/pkg/errors v0.9.1
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
-	k8s.io/api v0.24.0
-	k8s.io/apimachinery v0.24.0
-	k8s.io/client-go v0.24.0
+	k8s.io/api v0.24.2
+	k8s.io/apimachinery v0.24.2
+	k8s.io/client-go v0.24.2
 	k8s.io/cloud-provider v0.24.0
-	k8s.io/component-base v0.24.0
+	k8s.io/component-base v0.24.2
 	k8s.io/klog/v2 v2.60.1
 	sigs.k8s.io/cluster-api v1.1.4
 	sigs.k8s.io/controller-runtime v0.12.0
