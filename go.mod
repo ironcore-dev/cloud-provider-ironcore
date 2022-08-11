@@ -3,7 +3,7 @@ module github.com/onmetal/cloud-provider-onmetal
 go 1.18
 
 require (
-	github.com/onmetal/onmetal-api v0.0.11
+	github.com/onmetal/onmetal-api v0.0.12
 	github.com/onsi/ginkgo/v2 v2.1.4
 	github.com/onsi/gomega v1.19.0
 	github.com/pkg/errors v0.9.1
@@ -15,7 +15,7 @@ require (
 	k8s.io/component-base v0.24.0
 	k8s.io/klog/v2 v2.60.1
 	sigs.k8s.io/cluster-api v1.1.4
-	sigs.k8s.io/controller-runtime v0.12.0
+	sigs.k8s.io/controller-runtime v0.12.2-0.20220525133844-d15de977569f
 )
 
 require (
@@ -58,7 +58,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/onmetal/controller-utils v0.5.7 // indirect
+	github.com/onmetal/controller-utils v0.6.0 // indirect
 	github.com/prometheus/client_golang v1.12.1 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.32.1 // indirect

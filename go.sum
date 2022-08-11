@@ -380,10 +380,10 @@ github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLA
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
-github.com/onmetal/controller-utils v0.5.7 h1:aKug1BAq0Xjt92HrBU+f8C4y0ob9yx3iVIcp1W37f4I=
-github.com/onmetal/controller-utils v0.5.7/go.mod h1:PDIjMLuTpnY+BQxmMDToXyeqcPGPQxasDq/jzOdpfVw=
-github.com/onmetal/onmetal-api v0.0.11 h1:U70E6Ocz+3H2TUbLnfQ0YwIgYDL9HW6zP42zREP5BDs=
-github.com/onmetal/onmetal-api v0.0.11/go.mod h1:V/BW7NUyI0cjHcLV9re+goaPjs29TqGhI/qNCV+MBdQ=
+github.com/onmetal/controller-utils v0.6.0 h1:UvJFSdTOfR6vp2MqBcA9FGl5xV8/egasH3QdvI9g5qs=
+github.com/onmetal/controller-utils v0.6.0/go.mod h1:69wv03AfFUjR2IXV4OisZJzXtbCTtqcB3Mvf8MbKalM=
+github.com/onmetal/onmetal-api v0.0.12 h1:390VZ2yHhSpHJPJ+Xlf1mmWl9q7/FZze1yAnP1XX8Z0=
+github.com/onmetal/onmetal-api v0.0.12/go.mod h1:FoPRU0Us22VEGXPvjzef+obdEendBF+GyKnqwtfh5A8=
 github.com/onsi/ginkgo v0.0.0-20170829012221-11459a886d9c/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.12.1/go.mod h1:zj2OWP4+oCPe1qIXoGWkgMRwljMUYCdkwsT2108oapk=
@@ -1034,8 +1034,8 @@ sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.30 h1:dUk62HQ3ZFhD4
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.30/go.mod h1:fEO7lRTdivWO2qYVCVG7dEADOMo/MLDCVr8So2g88Uw=
 sigs.k8s.io/cluster-api v1.1.4 h1:mD44GELeiMfQKxyBmsxdYn/FmNAIkFWr2auM++qxx1A=
 sigs.k8s.io/cluster-api v1.1.4/go.mod h1:luiK6hLylbm4Kc7dkRw6KPAvNum9sAqpz5DfkdCaSW8=
-sigs.k8s.io/controller-runtime v0.12.0 h1:gA4zphrmHFc7ihmY/+GyyE0BxKD+OYdb5+DjD2azFAQ=
-sigs.k8s.io/controller-runtime v0.12.0/go.mod h1:BKhxlA4l7FPK4AQcsuL4X6vZeWnKDXez/vp1Y8dxTU0=
+sigs.k8s.io/controller-runtime v0.12.2-0.20220525133844-d15de977569f h1:UOMDRmZin4jM/rrCGrb0bIit7gapJItmWl2ZbVxHkB8=
+sigs.k8s.io/controller-runtime v0.12.2-0.20220525133844-d15de977569f/go.mod h1:BKhxlA4l7FPK4AQcsuL4X6vZeWnKDXez/vp1Y8dxTU0=
 sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2 h1:kDi4JBNAsJWfz1aEXhO8Jg87JJaPNLh5tIzYHgStQ9Y=
 sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2/go.mod h1:B+TnT182UBxE84DiCz4CVE26eOSDAeYCpfDnC2kdKMY=
 sigs.k8s.io/structured-merge-diff/v4 v4.0.2/go.mod h1:bJZC9H9iH24zzfZ/41RGcq60oK1F7G282QMXDPYydCw=
