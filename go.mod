@@ -9,7 +9,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
 	k8s.io/api v0.24.0
-	k8s.io/apimachinery v0.24.0
+	k8s.io/apimachinery v0.24.4
 	k8s.io/client-go v0.24.0
 	k8s.io/cloud-provider v0.24.0
 	k8s.io/component-base v0.24.0
