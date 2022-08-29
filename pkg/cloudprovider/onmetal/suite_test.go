@@ -17,9 +17,10 @@ limitations under the License.
 package onmetal
 
 import (
-	"context"
 	"go/build"
 	"io/ioutil"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -34,9 +35,11 @@ import (
 	"github.com/onmetal/onmetal-api/envtestutils/apiserver"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/pkg/errors"
 	"golang.org/x/mod/modfile"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	capiv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -64,7 +67,8 @@ var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
 	By("Bootstrapping test environment")
-	machinePackagePath := reflect.TypeOf(computev1alpha1.Machine{}).PkgPath()
+	onmetalApiPackagePath := reflect.TypeOf(computev1alpha1.Machine{}).PkgPath()
+	clusterApiPackagePath := reflect.TypeOf(capiv1beta1.Cluster{}).PkgPath()
 
 	goModData, err := ioutil.ReadFile(filepath.Join("..", "..", "..", "go.mod"))
 	Expect(err).NotTo(HaveOccurred())
@@ -72,63 +76,75 @@ var _ = BeforeSuite(func() {
 	goModFile, err := modfile.Parse("", goModData, nil)
 	Expect(err).NotTo(HaveOccurred())
 
-	packagePaths := []string{
-		machinePackagePath,
+	onmetalApiModulePath := findPackagePath(goModFile, onmetalApiPackagePath)
+	Expect(onmetalApiModulePath).NotTo(Equal(""))
+	clusterApiModulePath := findPackagePath(goModFile, clusterApiPackagePath)
+	Expect(clusterApiModulePath).NotTo(Equal(""))
+
+	onmetalApiCrdPath := filepath.Join(build.Default.GOPATH, "pkg", "mod", onmetalApiModulePath, "config", "apiserver", "apiservice", "bases")
+	clusterApiCrdPath := filepath.Join(build.Default.GOPATH, "pkg", "mod", clusterApiModulePath, "config", "crd", "bases")
+
+	testEnv = &envtest.Environment{
+		CRDDirectoryPaths: []string{filepath.Join("..", "config", "crd", "bases"), clusterApiCrdPath},
 	}
-
-	modulePaths := make([]string, len(packagePaths))
-
-	for _, req := range goModFile.Require {
-		for i, packagePath := range packagePaths {
-			if strings.HasPrefix(packagePath, req.Mod.Path) {
-				modulePaths[i] = req.Mod.String()
-			}
-		}
-	}
-
-	Expect(modulePaths).NotTo(ContainElement(""))
-
-	crdPaths := make([]string, len(modulePaths))
-
-	for i, modulePath := range modulePaths {
-		crdPaths[i] = filepath.Join(build.Default.GOPATH, "pkg", "mod", modulePath, "config", "apiserver", "apiservice", "bases")
-	}
-
-	testEnv = &envtest.Environment{}
 	testEnvExt = &envtestutils.EnvironmentExtensions{
-		APIServiceDirectoryPaths:       crdPaths,
+		APIServiceDirectoryPaths:       []string{onmetalApiCrdPath},
 		ErrorIfAPIServicePathIsMissing: true,
 	}
+
+	Expect(computev1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
+	Expect(storagev1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
+	Expect(ipamv1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
+	Expect(networkingv1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
+	Expect(capiv1beta1.AddToScheme(scheme.Scheme)).To(Succeed())
 
 	cfg, err = envtestutils.StartWithExtensions(testEnv, testEnvExt)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 	DeferCleanup(envtestutils.StopWithExtensions, testEnv, testEnvExt)
 
-	Expect(computev1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
-	Expect(storagev1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
-	Expect(ipamv1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
-	Expect(networkingv1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
-
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
+	testbinPath := filepath.Join("..", "..", "..", "testbin")
+	Expect(os.MkdirAll(testbinPath, os.ModePerm)).To(Succeed())
+
+	apiSrvBinPath := filepath.Join("..", "..", "..", "testbin", "apiserver")
+	absApiSrvBinPath, err := filepath.Abs(apiSrvBinPath)
+	Expect(err).NotTo(HaveOccurred())
+
+	if _, err := os.Stat(apiSrvBinPath); errors.Is(err, os.ErrNotExist) {
+		cmd := exec.Command("go", "build", "-o",
+			absApiSrvBinPath,
+			filepath.Join(build.Default.GOPATH, "pkg", "mod", onmetalApiModulePath, "cmd", "apiserver", "main.go"),
+		)
+		cmd.Dir = filepath.Join(build.Default.GOPATH, "pkg", "mod", onmetalApiModulePath)
+		Expect(cmd.Run()).To(Succeed())
+	}
+
 	apiSrv, err := apiserver.New(cfg, apiserver.Options{
-		Command:     []string{"go", "run", filepath.Join(build.Default.GOPATH, "pkg", "mod", modulePaths[0], "cmd", "apiserver", "main.go")},
-		ETCDServers: []string{testEnv.ControlPlane.Etcd.URL.String()},
-		Host:        testEnvExt.APIServiceInstallOptions.LocalServingHost,
-		Port:        testEnvExt.APIServiceInstallOptions.LocalServingPort,
-		CertDir:     testEnvExt.APIServiceInstallOptions.LocalServingCertDir,
+		Command:      []string{apiSrvBinPath},
+		ETCDServers:  []string{testEnv.ControlPlane.Etcd.URL.String()},
+		Host:         testEnvExt.APIServiceInstallOptions.LocalServingHost,
+		Port:         testEnvExt.APIServiceInstallOptions.LocalServingPort,
+		CertDir:      testEnvExt.APIServiceInstallOptions.LocalServingCertDir,
+		AttachOutput: true,
 	})
 	Expect(err).NotTo(HaveOccurred())
-	ctx, cancel := context.WithCancel(context.Background())
-	DeferCleanup(cancel)
-	go func() {
-		defer GinkgoRecover()
-		_ = apiSrv.Start(ctx)
-	}()
+
+	Expect(apiSrv.Start()).To(Succeed())
+	DeferCleanup(apiSrv.Stop)
 
 	err = envtestutils.WaitUntilAPIServicesReadyWithTimeout(5*time.Minute, testEnvExt, k8sClient, scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 })
+
+func findPackagePath(modFile *modfile.File, packagePath string) string {
+	for _, req := range modFile.Require {
+		if strings.HasPrefix(packagePath, req.Mod.Path) {
+			return req.Mod.String()
+		}
+	}
+	return ""
+}
