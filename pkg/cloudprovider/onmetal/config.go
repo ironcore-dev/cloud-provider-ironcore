@@ -2,7 +2,6 @@ package onmetal
 
 import (
 	"io"
-	"io/ioutil"
 
 	"github.com/pkg/errors"
 	"k8s.io/client-go/rest"
@@ -15,7 +14,7 @@ type onmetalCloudProviderConfig struct {
 }
 
 func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
-	configBytes, err := ioutil.ReadAll(f)
+	configBytes, err := io.ReadAll(f)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to read in config")
 	}

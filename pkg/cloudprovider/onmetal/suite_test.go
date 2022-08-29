@@ -18,7 +18,6 @@ package onmetal
 
 import (
 	"go/build"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -70,7 +69,7 @@ var _ = BeforeSuite(func() {
 	onmetalApiPackagePath := reflect.TypeOf(computev1alpha1.Machine{}).PkgPath()
 	clusterApiPackagePath := reflect.TypeOf(capiv1beta1.Cluster{}).PkgPath()
 
-	goModData, err := ioutil.ReadFile(filepath.Join("..", "..", "..", "go.mod"))
+	goModData, err := os.ReadFile(filepath.Join("..", "..", "..", "go.mod"))
 	Expect(err).NotTo(HaveOccurred())
 
 	goModFile, err := modfile.Parse("", goModData, nil)
