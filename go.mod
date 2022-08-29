@@ -1,6 +1,6 @@
 module github.com/onmetal/cloud-provider-onmetal
 
-go 1.18
+go 1.19
 
 require (
 	github.com/onmetal/onmetal-api v0.0.13-0.20220816071349-6a09b849a81a
