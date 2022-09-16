@@ -4,15 +4,15 @@ go 1.19
 
 require (
 	github.com/onmetal/onmetal-api v0.0.13-0.20220816071349-6a09b849a81a
-	github.com/onsi/ginkgo/v2 v2.1.4
-	github.com/onsi/gomega v1.20.0
+	github.com/onsi/ginkgo/v2 v2.1.6
+	github.com/onsi/gomega v1.20.1
 	github.com/pkg/errors v0.9.1
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
-	k8s.io/api v0.25.0
-	k8s.io/apimachinery v0.25.0
-	k8s.io/client-go v0.25.0
-	k8s.io/cloud-provider v0.25.0
-	k8s.io/component-base v0.25.0
+	k8s.io/api v0.25.1
+	k8s.io/apimachinery v0.25.1
+	k8s.io/client-go v0.25.1
+	k8s.io/cloud-provider v0.25.1
+	k8s.io/component-base v0.25.1
 	k8s.io/klog/v2 v2.70.1
 	sigs.k8s.io/cluster-api v1.2.1
 	sigs.k8s.io/controller-runtime v0.12.3
@@ -106,9 +106,9 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	inet.af/netaddr v0.0.0-20220617031823-097006376321 // indirect
 	k8s.io/apiextensions-apiserver v0.24.3 // indirect
-	k8s.io/apiserver v0.25.0 // indirect
-	k8s.io/component-helpers v0.25.0 // indirect
-	k8s.io/controller-manager v0.25.0 // indirect
+	k8s.io/apiserver v0.25.1 // indirect
+	k8s.io/component-helpers v0.25.1 // indirect
+	k8s.io/controller-manager v0.25.1 // indirect
 	k8s.io/kube-aggregator v0.24.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20220803162953-67bda5d908f1 // indirect
 	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed // indirect
