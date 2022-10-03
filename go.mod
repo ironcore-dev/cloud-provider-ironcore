@@ -14,7 +14,7 @@ require (
 	k8s.io/cloud-provider v0.25.0
 	k8s.io/component-base v0.25.0
 	k8s.io/klog/v2 v2.80.1
-	sigs.k8s.io/cluster-api v1.2.1
+	sigs.k8s.io/cluster-api v1.2.2
 	sigs.k8s.io/controller-runtime v0.12.3
 )
 
