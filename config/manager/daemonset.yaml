@@ -31,7 +31,7 @@ spec:
         - image: controller:latest
           name: cloud-controller-manager
           command:
-            - /app/cloud-controller-manager
+            - /manager
             - --cloud-provider=onmetal
             - --cloud-config=/app/config.yaml
             - --v=3
@@ -46,4 +46,4 @@ spec:
       volumes:
         - name: "onmetal-ccm-pvc"
           secret:
-            secretName: "onmetal-ccm-pvc"
+            secretName: "onmetal-ccm"
