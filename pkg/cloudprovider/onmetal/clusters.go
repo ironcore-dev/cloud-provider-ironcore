@@ -1,44 +1,44 @@
+// Copyright 2022 OnMetal authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package onmetal
 
 import (
 	"context"
-	"fmt"
 
-	onmetalapi "github.com/onmetal/onmetal-api/generated/clientset/versioned"
 	"github.com/pkg/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 	clusterapiv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
-)
-
-const (
-	CClusterCRDName = "clusters"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type onmetalClusters struct {
-	clientSet *onmetalapi.Clientset
+	client.Client
 	namespace string
 }
 
-func newOnmetalClusters(clientSet *onmetalapi.Clientset, namespace string) cloudprovider.Clusters {
+func newOnmetalClusters(client client.Client, namespace string) cloudprovider.Clusters {
 	return &onmetalClusters{
-		clientSet: clientSet,
+		Client:    client,
 		namespace: namespace,
 	}
 }
 
 func (o *onmetalClusters) ListClusters(ctx context.Context) ([]string, error) {
 	clusterList := &clusterapiv1beta1.ClusterList{}
-	err := o.clientSet.RESTClient().
-		Get().
-		Namespace(o.namespace).
-		Resource(fmt.Sprintf("%s.%s", CClusterCRDName, clusterapiv1beta1.GroupVersion.Group)).
-		VersionedParams(&metav1.ListOptions{}, scheme.ParameterCodec).
-		Do(ctx).
-		Into(clusterList)
-
-	if err != nil {
+	if err := o.List(ctx, clusterList); err != nil {
 		return nil, errors.Wrap(err, "unable to get cluster list")
 	}
 
@@ -51,19 +51,10 @@ func (o *onmetalClusters) ListClusters(ctx context.Context) ([]string, error) {
 }
 
 func (o *onmetalClusters) Master(ctx context.Context, clusterName string) (string, error) {
-	clusterItem := &clusterapiv1beta1.Cluster{}
-	err := o.clientSet.RESTClient().
-		Get().
-		Namespace(o.namespace).
-		Resource(fmt.Sprintf("%s.%s", CClusterCRDName, clusterapiv1beta1.GroupVersion.Group)).
-		Name(clusterName).
-		VersionedParams(&metav1.GetOptions{}, scheme.ParameterCodec).
-		Do(ctx).
-		Into(clusterItem)
-
-	if err != nil {
+	cluster := &clusterapiv1beta1.Cluster{}
+	if err := o.Get(ctx, types.NamespacedName{Name: clusterName}, cluster); err != nil {
 		return "", errors.Wrap(err, "unable to get cluster")
 	}
 
-	return clusterItem.Spec.ControlPlaneEndpoint.Host, nil
+	return cluster.Spec.ControlPlaneEndpoint.Host, nil
 }

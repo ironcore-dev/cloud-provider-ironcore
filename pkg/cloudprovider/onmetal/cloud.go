@@ -1,3 +1,17 @@
+// Copyright 2022 OnMetal authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package onmetal
 
 import (
@@ -9,13 +23,13 @@ import (
 	ipamv1alpha1 "github.com/onmetal/onmetal-api/apis/ipam/v1alpha1"
 	networkingv1alpha1 "github.com/onmetal/onmetal-api/apis/networking/v1alpha1"
 	storagev1alpha1 "github.com/onmetal/onmetal-api/apis/storage/v1alpha1"
-	onmetalapi "github.com/onmetal/onmetal-api/generated/clientset/versioned"
 	"github.com/pkg/errors"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	cloudprovider "k8s.io/cloud-provider"
 	clusterapiv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type onmetalCloudProvider struct {
@@ -36,6 +50,7 @@ func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
 }
 
 func newCloudProvider(config *onmetalCloudProviderConfig) (cloudprovider.Interface, error) {
+
 	if err := computev1alpha1.AddToScheme(scheme.Scheme); err != nil {
 		return nil, errors.Wrap(err, "unable to add onmetal compute api to scheme")
 	}
@@ -52,16 +67,18 @@ func newCloudProvider(config *onmetalCloudProviderConfig) (cloudprovider.Interfa
 		return nil, errors.Wrap(err, "unable to add cluster-api api to scheme")
 	}
 
-	onmetalClientSet, err := onmetalapi.NewForConfig(config.restConfig)
+	k8sClient, err := client.New(config.restConfig, client.Options{Scheme: scheme.Scheme})
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get onmetal clientset")
+		return nil, errors.Wrap(err, "unable to create Kubernetes client")
 	}
-	loadBalancer := newOnmetalLoadBalancer(onmetalClientSet)
-	instances := newOnmetalInstances(onmetalClientSet, config.namespace)
-	instancesV2 := newOnmetalInstancesV2(onmetalClientSet, config.namespace)
-	clusters := newOnmetalClusters(onmetalClientSet, config.namespace)
-	routes := newOnmetalRoutes(onmetalClientSet)
-	zones := newOnmetalZones(onmetalClientSet)
+
+	loadBalancer := newOnmetalLoadBalancer(k8sClient)
+	instances := newOnmetalInstances(k8sClient, config.namespace)
+	instancesV2 := newOnmetalInstancesV2(k8sClient, config.namespace)
+	clusters := newOnmetalClusters(k8sClient, config.namespace)
+	routes := newOnmetalRoutes(k8sClient)
+	zones := newOnmetalZones(k8sClient)
+
 	return &onmetalCloudProvider{
 		loadBalancer: loadBalancer,
 		instances:    instances,
@@ -116,7 +133,7 @@ func (o *onmetalCloudProvider) Routes() (cloudprovider.Routes, bool) {
 }
 
 func (o *onmetalCloudProvider) ProviderName() string {
-	return CDefaultCloudProviderName
+	return CloudProviderName
 }
 
 func (o *onmetalCloudProvider) HasClusterID() bool {

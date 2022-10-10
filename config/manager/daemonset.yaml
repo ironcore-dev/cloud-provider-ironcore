@@ -18,7 +18,7 @@ spec:
       dnsPolicy: Default
       serviceAccountName: cloud-controller-manager
       nodeSelector:
-        node-role.kubernetes.io/master: ""
+        kubernetes.io/hostname: kind-control-plane
       tolerations:
         - key: "node.cloudprovider.kubernetes.io/uninitialized"
           value: "true"
@@ -40,10 +40,10 @@ spec:
               cpu: 100m
               memory: 50Mi
           volumeMounts:
-            - name: "onmetal-ccm-pvc"
+            - name: onmetal-ccm
               mountPath: "/app/config.yaml"
               subPath: "config.yaml"
       volumes:
-        - name: "onmetal-ccm-pvc"
+        - name: onmetal-ccm
           secret:
             secretName: "onmetal-ccm"

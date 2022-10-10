@@ -3,6 +3,7 @@ module github.com/onmetal/cloud-provider-onmetal
 go 1.19
 
 require (
+	github.com/google/addlicense v1.0.0
 	github.com/onmetal/onmetal-api v0.0.13-0.20220816071349-6a09b849a81a
 	github.com/onsi/ginkgo/v2 v2.2.0
 	github.com/onsi/gomega v1.20.2
@@ -11,7 +12,7 @@ require (
 	k8s.io/api v0.25.2
 	k8s.io/apimachinery v0.25.2
 	k8s.io/client-go v0.25.2
-	k8s.io/cloud-provider v0.25.2
+	k8s.io/cloud-provider v0.24.4
 	k8s.io/component-base v0.25.2
 	k8s.io/klog/v2 v2.80.1
 	sigs.k8s.io/cluster-api v1.2.2
@@ -28,6 +29,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
+	github.com/bmatcuk/doublestar/v4 v4.0.2 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect

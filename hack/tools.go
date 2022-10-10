@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package onmetal
+//go:build tools
 
-const (
-	CloudProviderName = "onmetal"
+package hack
+
+import (
+	// Use addlicense for adding license headers.
+	_ "github.com/google/addlicense"
 )
