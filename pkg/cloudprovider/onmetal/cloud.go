@@ -15,30 +15,36 @@
 package onmetal
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"log"
-	"time"
 
 	computev1alpha1 "github.com/onmetal/onmetal-api/apis/compute/v1alpha1"
 	ipamv1alpha1 "github.com/onmetal/onmetal-api/apis/ipam/v1alpha1"
 	networkingv1alpha1 "github.com/onmetal/onmetal-api/apis/networking/v1alpha1"
 	storagev1alpha1 "github.com/onmetal/onmetal-api/apis/storage/v1alpha1"
 	"github.com/pkg/errors"
-	"k8s.io/client-go/informers"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/cache"
 	cloudprovider "k8s.io/cloud-provider"
-	clusterapiv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/cluster"
+)
+
+const (
+	CloudProviderName       = "onmetal"
+	machineMetadataUIDField = ".metadata.uid"
 )
 
 type onmetalCloudProvider struct {
-	loadBalancer cloudprovider.LoadBalancer
-	instances    cloudprovider.Instances
-	instancesV2  cloudprovider.InstancesV2
-	clusters     cloudprovider.Clusters
-	routes       cloudprovider.Routes
-	zones        cloudprovider.Zones
+	targetCluster  cluster.Cluster
+	onmetalCluster cluster.Cluster
+	loadBalancer   cloudprovider.LoadBalancer
+	instances      cloudprovider.Instances
+	instancesV2    cloudprovider.InstancesV2
+	routes         cloudprovider.Routes
+	zones          cloudprovider.Zones
 }
 
 func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
@@ -46,10 +52,6 @@ func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "can't decode yaml config")
 	}
-	return newCloudProvider(cfg)
-}
-
-func newCloudProvider(config *onmetalCloudProviderConfig) (cloudprovider.Interface, error) {
 
 	if err := computev1alpha1.AddToScheme(scheme.Scheme); err != nil {
 		return nil, errors.Wrap(err, "unable to add onmetal compute api to scheme")
@@ -63,48 +65,74 @@ func newCloudProvider(config *onmetalCloudProviderConfig) (cloudprovider.Interfa
 	if err := networkingv1alpha1.AddToScheme(scheme.Scheme); err != nil {
 		return nil, errors.Wrap(err, "unable to add onmetal networking api to scheme")
 	}
-	if err := clusterapiv1beta1.AddToScheme(scheme.Scheme); err != nil {
-		return nil, errors.Wrap(err, "unable to add cluster-api api to scheme")
-	}
 
-	k8sClient, err := client.New(config.restConfig, client.Options{Scheme: scheme.Scheme})
+	onmetalCluster, err := cluster.New(cfg.onmetalRestConfig, func(o *cluster.Options) {
+		o.Scheme = scheme.Scheme
+	})
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to create Kubernetes client")
+		return nil, fmt.Errorf("unable to create onmetal cluster: %w", err)
 	}
+	onmetalClient := onmetalCluster.GetClient()
 
-	loadBalancer := newOnmetalLoadBalancer(k8sClient)
-	instances := newOnmetalInstances(k8sClient, config.namespace)
-	instancesV2 := newOnmetalInstancesV2(k8sClient, config.namespace)
-	clusters := newOnmetalClusters(k8sClient, config.namespace)
-	routes := newOnmetalRoutes(k8sClient)
-	zones := newOnmetalZones(k8sClient)
+	targetCluster, err := cluster.New(cfg.targetRestConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create target cluster: %w", err)
+	}
+	targetClient := targetCluster.GetClient()
+
+	loadBalancer := newOnmetalLoadBalancer(onmetalClient)
+	instances := newOnmetalInstances(onmetalClient, targetClient, cfg.namespace)
+	instancesV2 := newOnmetalInstancesV2(onmetalClient, cfg.namespace)
+	routes := newOnmetalRoutes(onmetalClient)
+	zones := newOnmetalZones(onmetalClient)
 
 	return &onmetalCloudProvider{
-		loadBalancer: loadBalancer,
-		instances:    instances,
-		instancesV2:  instancesV2,
-		clusters:     clusters,
-		routes:       routes,
-		zones:        zones,
+		onmetalCluster: onmetalCluster,
+		targetCluster:  targetCluster,
+		loadBalancer:   loadBalancer,
+		instances:      instances,
+		instancesV2:    instancesV2,
+		routes:         routes,
+		zones:          zones,
 	}, nil
 }
 
 func (o *onmetalCloudProvider) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		defer cancel()
+		<-stop
+	}()
 
-	clientset := clientBuilder.ClientOrDie("cloud-provider-onmetal")
-
-	informerFactory := informers.NewSharedInformerFactory(clientset, time.Second*30)
-	serviceInformer := informerFactory.Core().V1().Services()
-	nodeInformer := informerFactory.Core().V1().Nodes()
-
-	go serviceInformer.Informer().Run(stop)
-	go nodeInformer.Informer().Run(stop)
-
-	if !cache.WaitForCacheSync(stop, serviceInformer.Informer().HasSynced) {
-		log.Fatal("Timed out waiting for caches to sync")
+	if err := o.onmetalCluster.GetFieldIndexer().IndexField(ctx, &computev1alpha1.Machine{}, machineMetadataUIDField, func(object client.Object) []string {
+		machine := object.(*computev1alpha1.Machine)
+		return []string{string(machine.UID)}
+	}); err != nil {
+		log.Fatalf("Failed to setup field indexer: %v", err)
 	}
-	if !cache.WaitForCacheSync(stop, nodeInformer.Informer().HasSynced) {
-		log.Fatal("Timed out waiting for caches to sync")
+
+	if _, err := o.targetCluster.GetCache().GetInformer(ctx, &corev1.Node{}); err != nil {
+		log.Fatalf("Failed to setup Node informer: %v", err)
+	}
+	// TODO: setup informer for Services
+
+	go func() {
+		if err := o.onmetalCluster.Start(ctx); err != nil {
+			log.Fatalf("Failed to start onmetal cluster: %v", err)
+		}
+	}()
+
+	go func() {
+		if err := o.targetCluster.Start(ctx); err != nil {
+			log.Fatalf("Failed to start target cluster: %v", err)
+		}
+	}()
+
+	if !o.onmetalCluster.GetCache().WaitForCacheSync(ctx) {
+		log.Fatal("Failed to wait for onmetal cluster cache to sync")
+	}
+	if !o.targetCluster.GetCache().WaitForCacheSync(ctx) {
+		log.Fatal("Failed to wait for target cluster cache to sync")
 	}
 }
 
@@ -125,7 +153,7 @@ func (o *onmetalCloudProvider) Zones() (cloudprovider.Zones, bool) {
 }
 
 func (o *onmetalCloudProvider) Clusters() (cloudprovider.Clusters, bool) {
-	return o.clusters, true
+	return nil, false
 }
 
 func (o *onmetalCloudProvider) Routes() (cloudprovider.Routes, bool) {

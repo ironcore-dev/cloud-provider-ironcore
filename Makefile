@@ -1,7 +1,8 @@
 BIN_NAME = "cloud-provider-onmetal"
 IMG ?= controller:latest
 
-GOPRIVATE ?= "github.com/onmetal/*"
+# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
+ENVTEST_K8S_VERSION = 1.24.2
 
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -38,7 +39,7 @@ checklicense: ## Check that every file has a license header present.
 lint: ## Run golangci-lint against code.
 		golangci-lint run ./...
 
-check: manifests generate checklicense lint test
+check: checklicense lint test
 
 .PHONY: test
 test: fmt vet envtest checklicense ## Run tests.
@@ -67,6 +68,9 @@ $(LOCALBIN):
 ## Tool Binaries
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
+## Tool Versions
+CONTROLLER_TOOLS_VERSION ?= v0.9.2
+
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
 $(CONTROLLER_GEN): $(LOCALBIN)
@@ -76,4 +80,3 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
 		test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
-

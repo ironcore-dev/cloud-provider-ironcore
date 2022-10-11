@@ -29,19 +29,21 @@ import (
 )
 
 type onmetalInstances struct {
-	client.Client
-	namespace string
+	onmetalClient client.Client
+	targetClient  client.Client
+	namespace     string
 }
 
-func newOnmetalInstances(client client.Client, namespace string) cloudprovider.Instances {
+func newOnmetalInstances(onmetalClient client.Client, targetClient client.Client, namespace string) cloudprovider.Instances {
 	return &onmetalInstances{
-		Client:    client,
-		namespace: namespace,
+		onmetalClient: onmetalClient,
+		targetClient:  targetClient,
+		namespace:     namespace,
 	}
 }
 
 func (o *onmetalInstances) NodeAddresses(ctx context.Context, nodeName types.NodeName) ([]corev1.NodeAddress, error) {
-	machine, err := GetMachineForNodeName(ctx, o.Client, nodeName)
+	machine, err := GetMachineForNodeName(ctx, o.onmetalClient, o.targetClient, nodeName)
 	if apierrors.IsNotFound(err) {
 		return nil, cloudprovider.InstanceNotFound
 	}
@@ -75,11 +77,15 @@ func (o *onmetalInstances) NodeAddresses(ctx context.Context, nodeName types.Nod
 }
 
 func (o *onmetalInstances) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]corev1.NodeAddress, error) {
-	return o.NodeAddresses(ctx, types.NodeName(getUIDFromProviderID(providerID)))
+	machine, err := GetMachineForProviderID(ctx, o.onmetalClient, providerID)
+	if err != nil {
+		return nil, err
+	}
+	return o.NodeAddresses(ctx, types.NodeName(machine.Name))
 }
 
 func (o *onmetalInstances) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
-	machine, err := GetMachineForNodeName(ctx, o.Client, nodeName)
+	machine, err := GetMachineForNodeName(ctx, o.onmetalClient, o.targetClient, nodeName)
 	if apierrors.IsNotFound(err) {
 		return "", cloudprovider.InstanceNotFound
 	}
@@ -90,7 +96,7 @@ func (o *onmetalInstances) InstanceID(ctx context.Context, nodeName types.NodeNa
 }
 
 func (o *onmetalInstances) InstanceType(ctx context.Context, nodeName types.NodeName) (string, error) {
-	machine, err := GetMachineForNodeName(ctx, o.Client, nodeName)
+	machine, err := GetMachineForNodeName(ctx, o.onmetalClient, o.targetClient, nodeName)
 	if apierrors.IsNotFound(err) {
 		return "", cloudprovider.InstanceNotFound
 	}
@@ -101,7 +107,7 @@ func (o *onmetalInstances) InstanceType(ctx context.Context, nodeName types.Node
 }
 
 func (o *onmetalInstances) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
-	return o.InstanceType(ctx, types.NodeName(getUIDFromProviderID(providerID)))
+	return o.InstanceType(ctx, types.NodeName(getMachineUIDFromProviderID(providerID)))
 }
 
 func (o *onmetalInstances) AddSSHKeyToAllInstances(_ context.Context, _ string, _ []byte) error {
@@ -113,7 +119,7 @@ func (o *onmetalInstances) CurrentNodeName(_ context.Context, hostName string) (
 }
 
 func (o *onmetalInstances) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
-	machine, err := GetMachineForProviderID(ctx, o.Client, providerID)
+	machine, err := GetMachineForProviderID(ctx, o.onmetalClient, providerID)
 	if apierrors.IsNotFound(err) {
 		return false, nil
 	}
@@ -127,7 +133,7 @@ func (o *onmetalInstances) InstanceExistsByProviderID(ctx context.Context, provi
 }
 
 func (o *onmetalInstances) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
-	machine, err := GetMachineForProviderID(ctx, o.Client, providerID)
+	machine, err := GetMachineForProviderID(ctx, o.onmetalClient, providerID)
 	if apierrors.IsNotFound(err) {
 		return false, nil
 	}
@@ -138,6 +144,6 @@ func (o *onmetalInstances) InstanceShutdownByProviderID(ctx context.Context, pro
 	return machine.Status.State == v1alpha1.MachineStateShutdown, nil
 }
 
-func getUIDFromProviderID(providerID string) string {
+func getMachineUIDFromProviderID(providerID string) string {
 	return strings.TrimPrefix(providerID, CloudProviderName+"://")
 }

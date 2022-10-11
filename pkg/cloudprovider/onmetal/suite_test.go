@@ -15,15 +15,13 @@
 package onmetal
 
 import (
-	"go/build"
+	"context"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"reflect"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/onmetal/controller-utils/buildutils"
+	"github.com/onmetal/controller-utils/modutils"
 	computev1alpha1 "github.com/onmetal/onmetal-api/apis/compute/v1alpha1"
 	ipamv1alpha1 "github.com/onmetal/onmetal-api/apis/ipam/v1alpha1"
 	networkingv1alpha1 "github.com/onmetal/onmetal-api/apis/networking/v1alpha1"
@@ -32,11 +30,14 @@ import (
 	"github.com/onmetal/onmetal-api/envtestutils/apiserver"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/pkg/errors"
-	"golang.org/x/mod/modfile"
+	"gopkg.in/yaml.v3"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	capiv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/controller-manager/pkg/clientbuilder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -48,13 +49,24 @@ var (
 	k8sClient  client.Client
 	testEnv    *envtest.Environment
 	testEnvExt *envtestutils.EnvironmentExtensions
+	provider   cloudprovider.Interface
+)
+
+const (
+	pollingInterval      = 50 * time.Millisecond
+	eventuallyTimeout    = 3 * time.Second
+	consistentlyDuration = 1 * time.Second
+	apiServiceTimeout    = 5 * time.Minute
 )
 
 func TestAPIs(t *testing.T) {
-	SetDefaultConsistentlyPollingInterval(100 * time.Millisecond)
-	SetDefaultEventuallyPollingInterval(100 * time.Millisecond)
-	SetDefaultEventuallyTimeout(30 * time.Second)
-	SetDefaultConsistentlyDuration(30 * time.Second)
+	_, reporterConfig := GinkgoConfiguration()
+	reporterConfig.SlowSpecThreshold = 10 * time.Second
+	SetDefaultConsistentlyPollingInterval(pollingInterval)
+	SetDefaultEventuallyPollingInterval(pollingInterval)
+	SetDefaultEventuallyTimeout(eventuallyTimeout)
+	SetDefaultConsistentlyDuration(consistentlyDuration)
+
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "Cloud Provider Suite")
@@ -63,85 +75,96 @@ func TestAPIs(t *testing.T) {
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
-	By("Bootstrapping test environment")
-	onmetalApiPackagePath := reflect.TypeOf(computev1alpha1.Machine{}).PkgPath()
-	clusterApiPackagePath := reflect.TypeOf(capiv1beta1.Cluster{}).PkgPath()
+	var err error
 
-	goModData, err := os.ReadFile(filepath.Join("..", "..", "..", "go.mod"))
-	Expect(err).NotTo(HaveOccurred())
-
-	goModFile, err := modfile.Parse("", goModData, nil)
-	Expect(err).NotTo(HaveOccurred())
-
-	onmetalApiModulePath := findPackagePath(goModFile, onmetalApiPackagePath)
-	Expect(onmetalApiModulePath).NotTo(Equal(""))
-	clusterApiModulePath := findPackagePath(goModFile, clusterApiPackagePath)
-	Expect(clusterApiModulePath).NotTo(Equal(""))
-
-	onmetalApiCrdPath := filepath.Join(build.Default.GOPATH, "pkg", "mod", onmetalApiModulePath, "config", "apiserver", "apiservice", "bases")
-	clusterApiCrdPath := filepath.Join(build.Default.GOPATH, "pkg", "mod", clusterApiModulePath, "config", "crd", "bases")
-
-	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "config", "crd", "bases"), clusterApiCrdPath},
-	}
+	By("bootstrapping test environment")
+	testEnv = &envtest.Environment{}
 	testEnvExt = &envtestutils.EnvironmentExtensions{
-		APIServiceDirectoryPaths:       []string{onmetalApiCrdPath},
+		APIServiceDirectoryPaths: []string{
+			modutils.Dir("github.com/onmetal/onmetal-api", "config", "apiserver", "apiservice", "bases"),
+		},
 		ErrorIfAPIServicePathIsMissing: true,
 	}
-
-	Expect(computev1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
-	Expect(storagev1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
-	Expect(ipamv1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
-	Expect(networkingv1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
-	Expect(capiv1beta1.AddToScheme(scheme.Scheme)).To(Succeed())
 
 	cfg, err = envtestutils.StartWithExtensions(testEnv, testEnvExt)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
+
 	DeferCleanup(envtestutils.StopWithExtensions, testEnv, testEnvExt)
 
+	Expect(computev1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
+	Expect(ipamv1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
+	Expect(storagev1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
+	Expect(networkingv1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
+
+	// Init package-level k8sClient
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
-	testbinPath := filepath.Join("..", "..", "..", "testbin")
-	Expect(os.MkdirAll(testbinPath, os.ModePerm)).To(Succeed())
-
-	apiSrvBinPath := filepath.Join("..", "..", "..", "testbin", "apiserver")
-	absApiSrvBinPath, err := filepath.Abs(apiSrvBinPath)
-	Expect(err).NotTo(HaveOccurred())
-
-	if _, err := os.Stat(apiSrvBinPath); errors.Is(err, os.ErrNotExist) {
-		cmd := exec.Command("go", "build", "-o",
-			absApiSrvBinPath,
-			filepath.Join(build.Default.GOPATH, "pkg", "mod", onmetalApiModulePath, "cmd", "apiserver", "main.go"),
-		)
-		cmd.Dir = filepath.Join(build.Default.GOPATH, "pkg", "mod", onmetalApiModulePath)
-		Expect(cmd.Run()).To(Succeed())
-	}
-
 	apiSrv, err := apiserver.New(cfg, apiserver.Options{
-		Command:      []string{apiSrvBinPath},
+		MainPath:     "github.com/onmetal/onmetal-api/cmd/apiserver",
+		BuildOptions: []buildutils.BuildOption{buildutils.ModModeMod},
 		ETCDServers:  []string{testEnv.ControlPlane.Etcd.URL.String()},
 		Host:         testEnvExt.APIServiceInstallOptions.LocalServingHost,
 		Port:         testEnvExt.APIServiceInstallOptions.LocalServingPort,
 		CertDir:      testEnvExt.APIServiceInstallOptions.LocalServingCertDir,
-		AttachOutput: true,
 	})
 	Expect(err).NotTo(HaveOccurred())
 
+	By("starting the onmetal-api aggregated api server")
 	Expect(apiSrv.Start()).To(Succeed())
 	DeferCleanup(apiSrv.Stop)
 
-	err = envtestutils.WaitUntilAPIServicesReadyWithTimeout(5*time.Minute, testEnvExt, k8sClient, scheme.Scheme)
+	Expect(envtestutils.WaitUntilAPIServicesReadyWithTimeout(apiServiceTimeout, testEnvExt, k8sClient, scheme.Scheme)).To(Succeed())
+
+	user, err := testEnv.AddUser(envtest.User{
+		Name:   "dummy",
+		Groups: []string{"system:authenticated", "system:masters"},
+	}, nil)
 	Expect(err).NotTo(HaveOccurred())
+
+	kubeconfigData, err := user.KubeConfig()
+	Expect(err).NotTo(HaveOccurred())
+
+	cloudConfigFile, err := os.CreateTemp(GinkgoT().TempDir(), "cloud.yaml")
+	//	kubeconfigFile, err := os.CreateTemp(GinkgoT().TempDir(), "kubeconfig")
+	Expect(err).NotTo(HaveOccurred())
+	defer func() {
+		_ = cloudConfigFile.Close()
+		//_ = kubeconfigFile.Close()
+	}()
+	cloudConfig := CloudConfig{OnmetalClusterKubeconfig: string(kubeconfigData)}
+	cloudConfigData, err := yaml.Marshal(&cloudConfig)
+	Expect(err).NotTo(HaveOccurred())
+
+	Expect(os.WriteFile(cloudConfigFile.Name(), cloudConfigData, 0666)).To(Succeed())
+	//Expect(os.WriteFile(kubeconfigFile.Name(), kubeconfigData, 0666)).To(Succeed())
+
+	//provider, err = InitCloudProvider(kubeconfigFile)
+	provider, err = InitCloudProvider(cloudConfigFile)
+	Expect(err).NotTo(HaveOccurred())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	DeferCleanup(cancel)
+
+	k8sClientSet, err := kubernetes.NewForConfig(cfg)
+	Expect(err).NotTo(HaveOccurred())
+
+	clientBuilder := clientbuilder.NewDynamicClientBuilder(testEnv.Config, k8sClientSet.CoreV1(), "default")
+	provider.Initialize(clientBuilder, ctx.Done())
 })
 
-func findPackagePath(modFile *modfile.File, packagePath string) string {
-	for _, req := range modFile.Require {
-		if strings.HasPrefix(packagePath, req.Mod.Path) {
-			return req.Mod.String()
+func SetupTest(ctx context.Context) *corev1.Namespace {
+	ns := &corev1.Namespace{}
+
+	BeforeEach(func() {
+		*ns = corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{GenerateName: "testns-"},
 		}
-	}
-	return ""
+		Expect(k8sClient.Create(ctx, ns)).NotTo(HaveOccurred(), "failed to create test namespace")
+		DeferCleanup(k8sClient.Delete, ctx, ns)
+	})
+
+	return ns
 }
