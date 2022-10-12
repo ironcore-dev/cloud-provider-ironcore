@@ -4,8 +4,8 @@ go 1.19
 
 require (
 	github.com/onmetal/onmetal-api v0.0.13-0.20220816071349-6a09b849a81a
-	github.com/onsi/ginkgo/v2 v2.2.0
-	github.com/onsi/gomega v1.20.2
+	github.com/onsi/ginkgo/v2 v2.3.0
+	github.com/onsi/gomega v1.21.1
 	github.com/pkg/errors v0.9.1
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4
 	k8s.io/api v0.25.2
