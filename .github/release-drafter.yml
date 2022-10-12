@@ -5,7 +5,6 @@ categories:
     labels:
       - 'feature'
       - 'enhancement'
-      - 'controllers'
   - title: '🐛 Bug Fixes'
     labels:
       - 'fix'
@@ -32,9 +31,6 @@ version-resolver:
 exclude-labels:
   - 'skip-changelog'
 autolabeler:
-  - label: 'controllers'
-    files:
-      - '/controllers/*'
   - label: 'documentation'
     files:
       - '*.md'

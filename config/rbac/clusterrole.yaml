@@ -3,7 +3,7 @@ kind: ClusterRole
 metadata:
   annotations:
     rbac.authorization.kubernetes.io/autoupdate: "true"
-  name: kube-system:cloud-controller-manager
+  name: system:cloud-controller-manager
 rules:
   - apiGroups:
       - ""

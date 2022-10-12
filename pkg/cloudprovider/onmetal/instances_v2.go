@@ -19,7 +19,6 @@ import (
 	"fmt"
 
 	"github.com/onmetal/onmetal-api/apis/compute/v1alpha1"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	cloudprovider "k8s.io/cloud-provider"
@@ -27,27 +26,25 @@ import (
 )
 
 type onmetalInstancesV2 struct {
-	client.Client
-	namespace string
+	onmetalClient client.Client
+	targetClient  client.Client
 }
 
-func newOnmetalInstancesV2(client client.Client, namespace string) cloudprovider.InstancesV2 {
+func newOnmetalInstancesV2(onmetalClient client.Client, targetClient client.Client) cloudprovider.InstancesV2 {
 	return &onmetalInstancesV2{
-		Client:    client,
-		namespace: namespace,
+		onmetalClient: onmetalClient,
+		targetClient:  targetClient,
 	}
 }
 
 func (o *onmetalInstancesV2) InstanceExists(ctx context.Context, node *corev1.Node) (bool, error) {
-	if node == nil {
-		return false, nil
-	}
-	_, err := GetMachineForNode(ctx, o.Client, node)
+
+	_, err := GetMachineForNode(ctx, o.onmetalClient, o.targetClient, node)
 	if apierrors.IsNotFound(err) {
-		return false, nil
+		return false, cloudprovider.InstanceNotFound
 	}
 	if err != nil {
-		return false, errors.Wrap(err, "unable to get machine")
+		return false, fmt.Errorf("unable to get machine for node %s: %w", node.Name, err)
 	}
 	return true, nil
 }
@@ -56,7 +53,10 @@ func (o *onmetalInstancesV2) InstanceShutdown(ctx context.Context, node *corev1.
 	if node == nil {
 		return false, nil
 	}
-	machine, err := GetMachineForNode(ctx, o.Client, node)
+	machine, err := GetMachineForNode(ctx, o.onmetalClient, o.targetClient, node)
+	if apierrors.IsNotFound(err) {
+		return false, cloudprovider.InstanceNotFound
+	}
 	if err != nil {
 		return false, fmt.Errorf("failed to get machine for node %s: %w", node.Name, err)
 	}
@@ -68,36 +68,36 @@ func (o *onmetalInstancesV2) InstanceMetadata(ctx context.Context, node *corev1.
 	if node == nil {
 		return nil, nil
 	}
-	machine, err := GetMachineForNode(ctx, o.Client, node)
+	machine, err := GetMachineForNode(ctx, o.onmetalClient, o.targetClient, node)
+	if apierrors.IsNotFound(err) {
+		return nil, cloudprovider.InstanceNotFound
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get machine for node %s: %w", node.Name, err)
 	}
 
 	addresses := make([]corev1.NodeAddress, 0)
 	for _, iface := range machine.Status.NetworkInterfaces {
-		virtualIP := iface.VirtualIP.String()
-		// TODO understand how to differentiate addresses
-		addresses = append(addresses, corev1.NodeAddress{
-			Type:    corev1.NodeInternalIP,
-			Address: virtualIP,
-		})
+		if iface.VirtualIP != nil {
+			addresses = append(addresses, corev1.NodeAddress{
+				Type:    corev1.NodeExternalIP,
+				Address: iface.VirtualIP.String(),
+			})
+		}
 		for _, ip := range iface.IPs {
-			ip := ip.String()
 			addresses = append(addresses, corev1.NodeAddress{
 				Type:    corev1.NodeInternalIP,
-				Address: ip,
+				Address: ip.String(),
 			})
 		}
 	}
 
-	// TODO understand how to get zones and regions
-	meta := &cloudprovider.InstanceMetadata{
+	// TODO: handle zone and region
+	return &cloudprovider.InstanceMetadata{
 		ProviderID:    node.Spec.ProviderID,
 		InstanceType:  machine.Spec.MachineClassRef.Name,
 		NodeAddresses: addresses,
 		Zone:          "",
 		Region:        "",
-	}
-
-	return meta, nil
+	}, nil
 }

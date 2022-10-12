@@ -26,13 +26,11 @@ import (
 
 type onmetalCloudProviderConfig struct {
 	onmetalRestConfig *rest.Config
-	targetRestConfig  *rest.Config
 	namespace         string
 }
 
 type CloudConfig struct {
 	OnmetalClusterKubeconfig string `json:"onmetalClusterKubeconfig"`
-	TargetClusterKubeconfig  string `json:"targetClusterKubeconfig"`
 }
 
 func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
@@ -47,15 +45,10 @@ func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
 	}
 
 	var onmetalClusterRestConfig *rest.Config
-	var targetClusterRestConfig *rest.Config
 
-	if len(cloudConfig.OnmetalClusterKubeconfig) == 0 {
+	if cloudConfig.OnmetalClusterKubeconfig == "" {
 		return nil, fmt.Errorf("no kubeconfig for the onmetal cluster provided")
 	} else {
-		//kubeConfigData, err := base64.StdEncoding.DecodeString(cloudConfig.OnmetalClusterKubeconfig)
-		//if err != nil {
-		//	return nil, fmt.Errorf("unable to base64 decode onmetal cluster kubeconfig: %w", err)
-		//}
 		kubeConfig, err := clientcmd.Load([]byte(cloudConfig.OnmetalClusterKubeconfig))
 		if err != nil {
 			return nil, fmt.Errorf("unable to read onmetal cluster kubeconfig: %w", err)
@@ -70,30 +63,7 @@ func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
 		}
 	}
 
-	// In case the target cluster is equal to the onmetal cluster, we will just reuse the same kubeconfig.
-	if len(cloudConfig.TargetClusterKubeconfig) == 0 {
-		targetClusterRestConfig = onmetalClusterRestConfig
-	} else {
-		//kubeConfigData, err := base64.StdEncoding.DecodeString(cloudConfig.TargetClusterKubeconfig)
-		//if err != nil {
-		//	return nil, fmt.Errorf("unable to base64 decode target cluster kubeconfig: %w", err)
-		//}
-		kubeConfig, err := clientcmd.Load([]byte(cloudConfig.TargetClusterKubeconfig))
-		if err != nil {
-			return nil, fmt.Errorf("unable to read target cluster kubeconfig: %w", err)
-		}
-		clientConfig := clientcmd.NewDefaultClientConfig(*kubeConfig, nil)
-		if err != nil {
-			return nil, fmt.Errorf("unable to serialize target cluster kubeconfig: %w", err)
-		}
-		targetClusterRestConfig, err = clientConfig.ClientConfig()
-		if err != nil {
-			return nil, fmt.Errorf("unable to get target cluster rest config: %w", err)
-		}
-	}
-
 	return &onmetalCloudProviderConfig{
 		onmetalRestConfig: onmetalClusterRestConfig,
-		targetRestConfig:  targetClusterRestConfig,
 	}, nil
 }

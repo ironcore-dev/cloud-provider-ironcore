@@ -54,7 +54,7 @@ var (
 
 const (
 	pollingInterval      = 50 * time.Millisecond
-	eventuallyTimeout    = 3 * time.Second
+	eventuallyTimeout    = 10 * time.Second
 	consistentlyDuration = 1 * time.Second
 	apiServiceTimeout    = 5 * time.Minute
 )
@@ -128,20 +128,16 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	cloudConfigFile, err := os.CreateTemp(GinkgoT().TempDir(), "cloud.yaml")
-	//	kubeconfigFile, err := os.CreateTemp(GinkgoT().TempDir(), "kubeconfig")
 	Expect(err).NotTo(HaveOccurred())
 	defer func() {
 		_ = cloudConfigFile.Close()
-		//_ = kubeconfigFile.Close()
 	}()
 	cloudConfig := CloudConfig{OnmetalClusterKubeconfig: string(kubeconfigData)}
 	cloudConfigData, err := yaml.Marshal(&cloudConfig)
 	Expect(err).NotTo(HaveOccurred())
 
 	Expect(os.WriteFile(cloudConfigFile.Name(), cloudConfigData, 0666)).To(Succeed())
-	//Expect(os.WriteFile(kubeconfigFile.Name(), kubeconfigData, 0666)).To(Succeed())
 
-	//provider, err = InitCloudProvider(kubeconfigFile)
 	provider, err = InitCloudProvider(cloudConfigFile)
 	Expect(err).NotTo(HaveOccurred())
 

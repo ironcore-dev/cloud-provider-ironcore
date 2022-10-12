@@ -17,8 +17,13 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 COPY cmd/ cmd
 COPY pkg/ pkg/
 
+ARG TARGETOS
+ARG TARGETARCH
+
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH} go build -a -o manager ./cmd/cloud-provider-onmetal/main.go
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg \
+    CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH} go build -a -o manager ./cmd/cloud-provider-onmetal/main.go
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details

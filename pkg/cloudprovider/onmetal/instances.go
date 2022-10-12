@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	"github.com/onmetal/onmetal-api/apis/compute/v1alpha1"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,14 +30,12 @@ import (
 type onmetalInstances struct {
 	onmetalClient client.Client
 	targetClient  client.Client
-	namespace     string
 }
 
-func newOnmetalInstances(onmetalClient client.Client, targetClient client.Client, namespace string) cloudprovider.Instances {
+func newOnmetalInstances(onmetalClient client.Client, targetClient client.Client) cloudprovider.Instances {
 	return &onmetalInstances{
 		onmetalClient: onmetalClient,
 		targetClient:  targetClient,
-		namespace:     namespace,
 	}
 }
 
@@ -49,9 +46,6 @@ func (o *onmetalInstances) NodeAddresses(ctx context.Context, nodeName types.Nod
 	}
 	if err != nil {
 		return nil, fmt.Errorf("unable to get machine for node name %s: %w", nodeName, err)
-	}
-	if machine == nil {
-		return nil, nil
 	}
 	addresses := make([]corev1.NodeAddress, 0)
 	for _, iface := range machine.Status.NetworkInterfaces {
@@ -78,8 +72,11 @@ func (o *onmetalInstances) NodeAddresses(ctx context.Context, nodeName types.Nod
 
 func (o *onmetalInstances) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]corev1.NodeAddress, error) {
 	machine, err := GetMachineForProviderID(ctx, o.onmetalClient, providerID)
+	if apierrors.IsNotFound(err) {
+		return []corev1.NodeAddress{}, cloudprovider.InstanceNotFound
+	}
 	if err != nil {
-		return nil, err
+		return []corev1.NodeAddress{}, err
 	}
 	return o.NodeAddresses(ctx, types.NodeName(machine.Name))
 }
@@ -119,15 +116,12 @@ func (o *onmetalInstances) CurrentNodeName(_ context.Context, hostName string) (
 }
 
 func (o *onmetalInstances) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
-	machine, err := GetMachineForProviderID(ctx, o.onmetalClient, providerID)
+	_, err := GetMachineForProviderID(ctx, o.onmetalClient, providerID)
 	if apierrors.IsNotFound(err) {
-		return false, nil
+		return false, cloudprovider.InstanceNotFound
 	}
 	if err != nil {
-		return false, errors.Wrap(err, "unable to get machine")
-	}
-	if machine == nil {
-		return false, nil
+		return false, fmt.Errorf("unable to get machine for provider ID %s: %w", providerID, err)
 	}
 	return true, nil
 }
@@ -135,7 +129,7 @@ func (o *onmetalInstances) InstanceExistsByProviderID(ctx context.Context, provi
 func (o *onmetalInstances) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
 	machine, err := GetMachineForProviderID(ctx, o.onmetalClient, providerID)
 	if apierrors.IsNotFound(err) {
-		return false, nil
+		return false, cloudprovider.InstanceNotFound
 	}
 	if err != nil {
 		return false, err

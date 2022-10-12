@@ -72,26 +72,16 @@ func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to create onmetal cluster: %w", err)
 	}
+
 	onmetalClient := onmetalCluster.GetClient()
 
-	targetCluster, err := cluster.New(cfg.targetRestConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create target cluster: %w", err)
-	}
-	targetClient := targetCluster.GetClient()
-
 	loadBalancer := newOnmetalLoadBalancer(onmetalClient)
-	instances := newOnmetalInstances(onmetalClient, targetClient, cfg.namespace)
-	instancesV2 := newOnmetalInstancesV2(onmetalClient, cfg.namespace)
 	routes := newOnmetalRoutes(onmetalClient)
 	zones := newOnmetalZones(onmetalClient)
 
 	return &onmetalCloudProvider{
 		onmetalCluster: onmetalCluster,
-		targetCluster:  targetCluster,
 		loadBalancer:   loadBalancer,
-		instances:      instances,
-		instancesV2:    instancesV2,
 		routes:         routes,
 		zones:          zones,
 	}, nil
@@ -103,6 +93,17 @@ func (o *onmetalCloudProvider) Initialize(clientBuilder cloudprovider.Controller
 		defer cancel()
 		<-stop
 	}()
+
+	cfg, err := clientBuilder.Config(CloudProviderName)
+	if err != nil {
+		log.Fatalf("Failed to get config: %v", err)
+	}
+	o.targetCluster, err = cluster.New(cfg)
+	if err != nil {
+		log.Fatalf("Failed to create new cluster: %v", err)
+	}
+	o.instances = newOnmetalInstances(o.onmetalCluster.GetClient(), o.targetCluster.GetClient())
+	o.instancesV2 = newOnmetalInstancesV2(o.onmetalCluster.GetClient(), o.targetCluster.GetClient())
 
 	if err := o.onmetalCluster.GetFieldIndexer().IndexField(ctx, &computev1alpha1.Machine{}, machineMetadataUIDField, func(object client.Object) []string {
 		machine := object.(*computev1alpha1.Machine)
@@ -145,7 +146,7 @@ func (o *onmetalCloudProvider) Instances() (cloudprovider.Instances, bool) {
 }
 
 func (o *onmetalCloudProvider) InstancesV2() (cloudprovider.InstancesV2, bool) {
-	return nil, false
+	return o.instancesV2, true
 }
 
 func (o *onmetalCloudProvider) Zones() (cloudprovider.Zones, bool) {

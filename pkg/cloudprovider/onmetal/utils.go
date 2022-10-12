@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	cloudprovider "k8s.io/cloud-provider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -44,8 +45,11 @@ func GetMachineForProviderID(ctx context.Context, c client.Client, providerID st
 	}
 }
 
-func GetMachineForNode(ctx context.Context, c client.Client, node *corev1.Node) (*v1alpha1.Machine, error) {
-	machine, err := GetMachineForNodeName(ctx, c, nil, types.NodeName(node.Name))
+func GetMachineForNode(ctx context.Context, onmetalClient client.Client, targetClient client.Client, node *corev1.Node) (*v1alpha1.Machine, error) {
+	if node == nil {
+		return nil, nil
+	}
+	machine, err := GetMachineForNodeName(ctx, onmetalClient, targetClient, types.NodeName(node.Name))
 	if err != nil {
 		return nil, err
 	}
@@ -54,23 +58,31 @@ func GetMachineForNode(ctx context.Context, c client.Client, node *corev1.Node) 
 
 func GetMachineForNodeName(ctx context.Context, onmetalClient client.Client, targetClient client.Client, nodeName types.NodeName) (*v1alpha1.Machine, error) {
 	node, err := GetValidNodeForNodeName(ctx, targetClient, nodeName)
+	if apierrors.IsNotFound(err) {
+		return nil, cloudprovider.InstanceNotFound
+	}
 	if err != nil {
 		return nil, err
 	}
 	if node == nil {
-		return nil, nil
+		return nil, cloudprovider.InstanceNotFound
 	}
 	return GetMachineForProviderID(ctx, onmetalClient, node.Spec.ProviderID)
 }
 
 func GetValidNodeForNodeName(ctx context.Context, targetClient client.Client, nodeName types.NodeName) (*corev1.Node, error) {
 	node := &corev1.Node{}
-	if err := targetClient.Get(ctx, types.NamespacedName{Name: string(nodeName)}, node); err != nil {
+	err := targetClient.Get(ctx, types.NamespacedName{Name: string(nodeName)}, node)
+	if apierrors.IsNotFound(err) {
+		return nil, cloudprovider.InstanceNotFound
+	}
+	if err != nil {
 		return nil, fmt.Errorf("failed to get node object %s: %w", nodeName, err)
 	}
+
 	if !IsValidProviderID(node.Spec.ProviderID) {
 		// ignore invalid or empty provider IDs
-		return nil, nil
+		return nil, cloudprovider.InstanceNotFound
 	}
 	return node, nil
 }

@@ -15,8 +15,8 @@
 package onmetal
 
 import (
-	"context"
 	"fmt"
+	"net/netip"
 
 	commonv1alpha1 "github.com/onmetal/onmetal-api/apis/common/v1alpha1"
 	computev1alpha1 "github.com/onmetal/onmetal-api/apis/compute/v1alpha1"
@@ -28,29 +28,27 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var _ = Describe("Instances", func() {
 	ctx := testutils.SetupContext()
-	namespace := SetupTest(ctx)
+	ns := SetupTest(ctx)
 
 	It("Should get instance info", func() {
-		ctx := context.Background()
-
+		By("creating a network")
 		network := &networkingv1alpha1.Network{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    namespace.Name,
+				Namespace:    ns.Name,
 				GenerateName: "network-",
 			},
 		}
 		Expect(k8sClient.Create(ctx, network)).To(Succeed())
 
-		nodeIpString := "10.0.0.1"
-
 		By("creating a machine")
 		machine := &computev1alpha1.Machine{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    namespace.Name,
+				Namespace:    ns.Name,
 				GenerateName: "machine-",
 			},
 			Spec: computev1alpha1.MachineSpec{
@@ -58,13 +56,23 @@ var _ = Describe("Instances", func() {
 				Image:           "my-image:latest",
 				NetworkInterfaces: []computev1alpha1.NetworkInterface{
 					{
-						Name: "interface",
+						Name: "my-nic",
 						NetworkInterfaceSource: computev1alpha1.NetworkInterfaceSource{
 							Ephemeral: &computev1alpha1.EphemeralNetworkInterfaceSource{
 								NetworkInterfaceTemplate: &networkingv1alpha1.NetworkInterfaceTemplateSpec{
 									Spec: networkingv1alpha1.NetworkInterfaceSpec{
 										NetworkRef: corev1.LocalObjectReference{Name: network.Name},
-										IPs:        []networkingv1alpha1.IPSource{{Value: commonv1alpha1.MustParseNewIP(nodeIpString)}},
+										IPs:        []networkingv1alpha1.IPSource{{Value: commonv1alpha1.MustParseNewIP("10.0.0.1")}},
+										VirtualIP: &networkingv1alpha1.VirtualIPSource{
+											Ephemeral: &networkingv1alpha1.EphemeralVirtualIPSource{
+												VirtualIPTemplate: &networkingv1alpha1.VirtualIPTemplateSpec{
+													Spec: networkingv1alpha1.VirtualIPSpec{
+														Type:     networkingv1alpha1.VirtualIPTypePublic,
+														IPFamily: corev1.IPv4Protocol,
+													},
+												},
+											},
+										},
 									},
 								},
 							},
@@ -76,6 +84,18 @@ var _ = Describe("Instances", func() {
 		}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
 
+		By("patching the machine status to have a valid virtual IP and internal IP interface address")
+		machineBase := machine.DeepCopy()
+		machine.Status.State = computev1alpha1.MachineStateRunning
+		machine.Status.NetworkInterfaces = []computev1alpha1.NetworkInterfaceStatus{{
+			Name:      "my-nic",
+			Phase:     computev1alpha1.NetworkInterfacePhaseBound,
+			IPs:       []commonv1alpha1.IP{{Addr: netip.MustParseAddr("10.0.0.1")}},
+			VirtualIP: &commonv1alpha1.IP{Addr: netip.MustParseAddr("10.0.0.10")},
+		}}
+		Expect(k8sClient.Status().Patch(ctx, machine, client.MergeFrom(machineBase))).To(Succeed())
+
+		By("creating a node object with a provider ID referencing the machine")
 		node := &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: machine.Name,
@@ -86,48 +106,198 @@ var _ = Describe("Instances", func() {
 		}
 		Expect(k8sClient.Create(ctx, node)).To(Succeed())
 
+		By("getting the instances interface")
 		instances, ok := provider.Instances()
 		Expect(ok).To(BeTrue())
 
-		addresses, err := instances.NodeAddresses(ctx, types.NodeName(node.Name))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(addresses).To(Equal([]corev1.NodeAddress{
-			{
+		By("ensuring that the node address list contains the hostname, internal and external IP")
+		Eventually(func(g Gomega) {
+			addresses, err := instances.NodeAddresses(ctx, types.NodeName(node.Name))
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(addresses).To(ContainElement(corev1.NodeAddress{
 				Type:    corev1.NodeHostName,
-				Address: machine.Name,
-			},
-		}))
+				Address: machine.Name}))
+			g.Expect(addresses).To(ContainElement(corev1.NodeAddress{
+				Type:    corev1.NodeInternalIP,
+				Address: "10.0.0.1"}))
+			g.Expect(addresses).To(ContainElement(corev1.NodeAddress{
+				Type:    corev1.NodeExternalIP,
+				Address: "10.0.0.10"}))
+		}).Should(Succeed())
 
-		addresses, err = instances.NodeAddressesByProviderID(ctx, fmt.Sprintf("%s://%s", CloudProviderName, machine.UID))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(addresses).To(Equal([]corev1.NodeAddress{
-			{
+		By("ensuring that the node address list derived from the provider ID contains the hostname, internal and external IP")
+		Eventually(func(g Gomega) {
+			addresses, err := instances.NodeAddressesByProviderID(ctx, fmt.Sprintf("%s://%s", CloudProviderName, machine.UID))
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(addresses).To(ContainElement(corev1.NodeAddress{
 				Type:    corev1.NodeHostName,
-				Address: machine.Name,
-			},
-		}))
+				Address: machine.Name}))
+			g.Expect(addresses).To(ContainElement(corev1.NodeAddress{
+				Type:    corev1.NodeInternalIP,
+				Address: "10.0.0.1"}))
+			g.Expect(addresses).To(ContainElement(corev1.NodeAddress{
+				Type:    corev1.NodeExternalIP,
+				Address: "10.0.0.10"}))
+		}).Should(Succeed())
 
-		nodeID, err := instances.InstanceID(ctx, types.NodeName(machine.Name))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(nodeID).To(Equal(string(machine.UID)))
+		By("ensuring that the instance id is the machine name")
+		Eventually(func(g Gomega) {
+			nodeID, err := instances.InstanceID(ctx, types.NodeName(machine.Name))
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(nodeID).To(Equal(string(machine.UID)))
+		}).Should(Succeed())
 
-		instanceType, err := instances.InstanceType(ctx, types.NodeName(machine.Name))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(instanceType).To(Equal(machine.Spec.MachineClassRef.Name))
+		By("ensuring that the instance type is the machine class name")
+		Eventually(func(g Gomega) {
+			instanceType, err := instances.InstanceType(ctx, types.NodeName(machine.Name))
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(instanceType).To(Equal(machine.Spec.MachineClassRef.Name))
+		}).Should(Succeed())
 
-		err = instances.AddSSHKeyToAllInstances(ctx, "", []byte{})
+		By("ignoring the ssh key for all instances is not implemented")
+		err := instances.AddSSHKeyToAllInstances(ctx, "", []byte{})
 		Expect(err).To(Equal(cloudprovider.NotImplemented))
 
-		nodeNameTyped, err := instances.CurrentNodeName(ctx, machine.Name)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(nodeNameTyped).To(Equal(types.NodeName(machine.Name)))
+		By("ensuring that the current node name is the machine name")
+		Eventually(func(g Gomega) {
+			nodeNameTyped, err := instances.CurrentNodeName(ctx, machine.Name)
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(nodeNameTyped).To(Equal(types.NodeName(machine.Name)))
+		}).Should(Succeed())
 
-		exists, err := instances.InstanceExistsByProviderID(ctx, fmt.Sprintf("%s://%s", CloudProviderName, machine.UID))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(exists).To(BeTrue())
+		By("ensuring that the instance can be found by it's provider ID")
+		Eventually(func(g Gomega) {
+			exists, err := instances.InstanceExistsByProviderID(ctx, fmt.Sprintf("%s://%s", CloudProviderName, machine.UID))
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(exists).To(BeTrue())
+		}).Should(Succeed())
 
-		shutdown, err := instances.InstanceShutdownByProviderID(ctx, fmt.Sprintf("%s://%s", CloudProviderName, machine.UID))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(shutdown).To(BeFalse())
+		By("ensuring that the instance is not shut down")
+		Eventually(func(g Gomega) {
+			shutdown, err := instances.InstanceShutdownByProviderID(ctx, fmt.Sprintf("%s://%s", CloudProviderName, machine.UID))
+			g.Expect(err).NotTo(HaveOccurred())
+			g.Expect(shutdown).To(BeFalse())
+		}).Should(Succeed())
+	})
+
+	It("Should not get instance for not supported provider ID", func() {
+		By("creating a node object with an unsupported provider and wrong ID")
+		const wrongProvider = "fake"
+		const wrongInstanceID = "12345"
+		node := &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "my-node-",
+			},
+			Spec: corev1.NodeSpec{
+				ProviderID: fmt.Sprintf("%s://%s", wrongProvider, wrongInstanceID),
+			},
+		}
+		Expect(k8sClient.Create(ctx, node)).To(Succeed())
+
+		By("getting the instances interface")
+		instances, ok := provider.Instances()
+		Expect(ok).To(BeTrue())
+
+		By("ensuring that the node address list is empty")
+		Eventually(func(g Gomega) {
+			addresses, err := instances.NodeAddresses(ctx, types.NodeName(node.Name))
+			g.Expect(err).To(HaveOccurred())
+			g.Expect(addresses).To(BeEmpty())
+		}).Should(Succeed())
+
+		By("ensuring that the node address for provider ID returns an empty list")
+		Eventually(func(g Gomega) {
+			addresses, err := instances.NodeAddressesByProviderID(ctx, fmt.Sprintf("%s://%s", wrongProvider, wrongInstanceID))
+			g.Expect(err).To(Equal(cloudprovider.InstanceNotFound))
+			g.Expect(addresses).To(BeEmpty())
+		}).Should(Succeed())
+
+		By("ensuring that the instance ID can not be found")
+		Eventually(func(g Gomega) {
+			nodeID, err := instances.InstanceID(ctx, types.NodeName(node.Name))
+			g.Expect(err).To(HaveOccurred())
+			g.Expect(nodeID).To(Equal(""))
+		}).Should(Succeed())
+
+		By("ensuring that the instance type is empty")
+		Eventually(func(g Gomega) {
+			instanceType, err := instances.InstanceType(ctx, types.NodeName(node.Name))
+			g.Expect(err).To(HaveOccurred())
+			g.Expect(instanceType).To(Equal(""))
+		}).Should(Succeed())
+
+		By("ensuring that the instance can not be found by it's provider ID")
+		Eventually(func(g Gomega) {
+			exists, err := instances.InstanceExistsByProviderID(ctx, fmt.Sprintf("%s://%s", wrongProvider, wrongInstanceID))
+			g.Expect(err).To(HaveOccurred())
+			g.Expect(exists).To(BeFalse())
+		}).Should(Succeed())
+
+		By("ensuring that the non existing instance is shut down")
+		Eventually(func(g Gomega) {
+			shutdown, err := instances.InstanceShutdownByProviderID(ctx, fmt.Sprintf("%s://%s", wrongProvider, wrongInstanceID))
+			g.Expect(err).To(HaveOccurred())
+			g.Expect(shutdown).To(BeFalse())
+		}).Should(Succeed())
+	})
+
+	It("Should not get instance for when a wrong instance ID is provided", func() {
+		By("creating a node object with a wrong instance ID")
+		const wrongInstanceID = "12345"
+		node := &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "my-node-",
+			},
+			Spec: corev1.NodeSpec{
+				ProviderID: fmt.Sprintf("%s://%s", CloudProviderName, wrongInstanceID),
+			},
+		}
+		Expect(k8sClient.Create(ctx, node)).To(Succeed())
+
+		By("getting the instances interface")
+		instances, ok := provider.Instances()
+		Expect(ok).To(BeTrue())
+
+		By("ensuring that the node address list is empty")
+		Eventually(func(g Gomega) {
+			addresses, err := instances.NodeAddresses(ctx, types.NodeName(node.Name))
+			g.Expect(err).To(HaveOccurred())
+			g.Expect(addresses).To(BeEmpty())
+		}).Should(Succeed())
+
+		By("ensuring that the node address for provider ID returns an empty list")
+		Eventually(func(g Gomega) {
+			addresses, err := instances.NodeAddressesByProviderID(ctx, fmt.Sprintf("%s://%s", CloudProviderName, wrongInstanceID))
+			g.Expect(err).To(Equal(cloudprovider.InstanceNotFound))
+			g.Expect(addresses).To(BeEmpty())
+		}).Should(Succeed())
+
+		By("ensuring that the instance ID can not be found")
+		Eventually(func(g Gomega) {
+			nodeID, err := instances.InstanceID(ctx, types.NodeName(node.Name))
+			g.Expect(err).To(HaveOccurred())
+			g.Expect(nodeID).To(Equal(""))
+		}).Should(Succeed())
+
+		By("ensuring that the instance type is empty")
+		Eventually(func(g Gomega) {
+			instanceType, err := instances.InstanceType(ctx, types.NodeName(node.Name))
+			g.Expect(err).To(HaveOccurred())
+			g.Expect(instanceType).To(Equal(""))
+		}).Should(Succeed())
+
+		By("ensuring that the instance can not be found by it's provider ID")
+		Eventually(func(g Gomega) {
+			exists, err := instances.InstanceExistsByProviderID(ctx, fmt.Sprintf("%s://%s", CloudProviderName, wrongInstanceID))
+			g.Expect(err).To(HaveOccurred())
+			g.Expect(exists).To(BeFalse())
+		}).Should(Succeed())
+
+		By("ensuring that the non existing instance is shut down")
+		Eventually(func(g Gomega) {
+			shutdown, err := instances.InstanceShutdownByProviderID(ctx, fmt.Sprintf("%s://%s", CloudProviderName, wrongInstanceID))
+			g.Expect(err).To(HaveOccurred())
+			g.Expect(shutdown).To(BeFalse())
+		}).Should(Succeed())
 	})
 })
