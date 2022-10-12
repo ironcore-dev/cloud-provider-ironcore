@@ -44,23 +44,21 @@ func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
 		return nil, fmt.Errorf("failed to unmarshal cloud config: %w", err)
 	}
 
-	var onmetalClusterRestConfig *rest.Config
-
 	if cloudConfig.OnmetalClusterKubeconfig == "" {
 		return nil, fmt.Errorf("no kubeconfig for the onmetal cluster provided")
-	} else {
-		kubeConfig, err := clientcmd.Load([]byte(cloudConfig.OnmetalClusterKubeconfig))
-		if err != nil {
-			return nil, fmt.Errorf("unable to read onmetal cluster kubeconfig: %w", err)
-		}
-		clientConfig := clientcmd.NewDefaultClientConfig(*kubeConfig, nil)
-		if err != nil {
-			return nil, fmt.Errorf("unable to serialize onmetal cluster kubeconfig: %w", err)
-		}
-		onmetalClusterRestConfig, err = clientConfig.ClientConfig()
-		if err != nil {
-			return nil, fmt.Errorf("unable to get onmetal cluster rest config: %w", err)
-		}
+	}
+
+	kubeConfig, err := clientcmd.Load([]byte(cloudConfig.OnmetalClusterKubeconfig))
+	if err != nil {
+		return nil, fmt.Errorf("unable to read onmetal cluster kubeconfig: %w", err)
+	}
+	clientConfig := clientcmd.NewDefaultClientConfig(*kubeConfig, nil)
+	if err != nil {
+		return nil, fmt.Errorf("unable to serialize onmetal cluster kubeconfig: %w", err)
+	}
+	onmetalClusterRestConfig, err := clientConfig.ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("unable to get onmetal cluster rest config: %w", err)
 	}
 
 	return &onmetalCloudProviderConfig{
