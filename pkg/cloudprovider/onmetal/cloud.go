@@ -1,30 +1,50 @@
+// Copyright 2022 OnMetal authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package onmetal
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"log"
-	"time"
 
 	computev1alpha1 "github.com/onmetal/onmetal-api/apis/compute/v1alpha1"
 	ipamv1alpha1 "github.com/onmetal/onmetal-api/apis/ipam/v1alpha1"
 	networkingv1alpha1 "github.com/onmetal/onmetal-api/apis/networking/v1alpha1"
 	storagev1alpha1 "github.com/onmetal/onmetal-api/apis/storage/v1alpha1"
-	onmetalapi "github.com/onmetal/onmetal-api/generated/clientset/versioned"
 	"github.com/pkg/errors"
-	"k8s.io/client-go/informers"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/cache"
 	cloudprovider "k8s.io/cloud-provider"
-	clusterapiv1beta1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/cluster"
+)
+
+const (
+	CloudProviderName       = "onmetal"
+	machineMetadataUIDField = ".metadata.uid"
 )
 
 type onmetalCloudProvider struct {
-	loadBalancer cloudprovider.LoadBalancer
-	instances    cloudprovider.Instances
-	instancesV2  cloudprovider.InstancesV2
-	clusters     cloudprovider.Clusters
-	routes       cloudprovider.Routes
-	zones        cloudprovider.Zones
+	targetCluster  cluster.Cluster
+	onmetalCluster cluster.Cluster
+	loadBalancer   cloudprovider.LoadBalancer
+	instances      cloudprovider.Instances
+	instancesV2    cloudprovider.InstancesV2
+	routes         cloudprovider.Routes
+	zones          cloudprovider.Zones
 }
 
 func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
@@ -32,10 +52,7 @@ func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "can't decode yaml config")
 	}
-	return newCloudProvider(cfg)
-}
 
-func newCloudProvider(config *onmetalCloudProviderConfig) (cloudprovider.Interface, error) {
 	if err := computev1alpha1.AddToScheme(scheme.Scheme); err != nil {
 		return nil, errors.Wrap(err, "unable to add onmetal compute api to scheme")
 	}
@@ -48,46 +65,75 @@ func newCloudProvider(config *onmetalCloudProviderConfig) (cloudprovider.Interfa
 	if err := networkingv1alpha1.AddToScheme(scheme.Scheme); err != nil {
 		return nil, errors.Wrap(err, "unable to add onmetal networking api to scheme")
 	}
-	if err := clusterapiv1beta1.AddToScheme(scheme.Scheme); err != nil {
-		return nil, errors.Wrap(err, "unable to add cluster-api api to scheme")
+
+	onmetalCluster, err := cluster.New(cfg.onmetalRestConfig, func(o *cluster.Options) {
+		o.Scheme = scheme.Scheme
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to create onmetal cluster: %w", err)
 	}
 
-	onmetalClientSet, err := onmetalapi.NewForConfig(config.restConfig)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to get onmetal clientset")
-	}
-	loadBalancer := newOnmetalLoadBalancer(onmetalClientSet)
-	instances := newOnmetalInstances(onmetalClientSet, config.namespace)
-	instancesV2 := newOnmetalInstancesV2(onmetalClientSet, config.namespace)
-	clusters := newOnmetalClusters(onmetalClientSet, config.namespace)
-	routes := newOnmetalRoutes(onmetalClientSet)
-	zones := newOnmetalZones(onmetalClientSet)
+	onmetalClient := onmetalCluster.GetClient()
+
+	loadBalancer := newOnmetalLoadBalancer(onmetalClient)
+	routes := newOnmetalRoutes(onmetalClient)
+	zones := newOnmetalZones(onmetalClient)
+
 	return &onmetalCloudProvider{
-		loadBalancer: loadBalancer,
-		instances:    instances,
-		instancesV2:  instancesV2,
-		clusters:     clusters,
-		routes:       routes,
-		zones:        zones,
+		onmetalCluster: onmetalCluster,
+		loadBalancer:   loadBalancer,
+		routes:         routes,
+		zones:          zones,
 	}, nil
 }
 
 func (o *onmetalCloudProvider) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		defer cancel()
+		<-stop
+	}()
 
-	clientset := clientBuilder.ClientOrDie("cloud-provider-onmetal")
-
-	informerFactory := informers.NewSharedInformerFactory(clientset, time.Second*30)
-	serviceInformer := informerFactory.Core().V1().Services()
-	nodeInformer := informerFactory.Core().V1().Nodes()
-
-	go serviceInformer.Informer().Run(stop)
-	go nodeInformer.Informer().Run(stop)
-
-	if !cache.WaitForCacheSync(stop, serviceInformer.Informer().HasSynced) {
-		log.Fatal("Timed out waiting for caches to sync")
+	cfg, err := clientBuilder.Config(CloudProviderName)
+	if err != nil {
+		log.Fatalf("Failed to get config: %v", err)
 	}
-	if !cache.WaitForCacheSync(stop, nodeInformer.Informer().HasSynced) {
-		log.Fatal("Timed out waiting for caches to sync")
+	o.targetCluster, err = cluster.New(cfg)
+	if err != nil {
+		log.Fatalf("Failed to create new cluster: %v", err)
+	}
+	o.instances = newOnmetalInstances(o.onmetalCluster.GetClient(), o.targetCluster.GetClient())
+	o.instancesV2 = newOnmetalInstancesV2(o.onmetalCluster.GetClient(), o.targetCluster.GetClient())
+
+	if err := o.onmetalCluster.GetFieldIndexer().IndexField(ctx, &computev1alpha1.Machine{}, machineMetadataUIDField, func(object client.Object) []string {
+		machine := object.(*computev1alpha1.Machine)
+		return []string{string(machine.UID)}
+	}); err != nil {
+		log.Fatalf("Failed to setup field indexer: %v", err)
+	}
+
+	if _, err := o.targetCluster.GetCache().GetInformer(ctx, &corev1.Node{}); err != nil {
+		log.Fatalf("Failed to setup Node informer: %v", err)
+	}
+	// TODO: setup informer for Services
+
+	go func() {
+		if err := o.onmetalCluster.Start(ctx); err != nil {
+			log.Fatalf("Failed to start onmetal cluster: %v", err)
+		}
+	}()
+
+	go func() {
+		if err := o.targetCluster.Start(ctx); err != nil {
+			log.Fatalf("Failed to start target cluster: %v", err)
+		}
+	}()
+
+	if !o.onmetalCluster.GetCache().WaitForCacheSync(ctx) {
+		log.Fatal("Failed to wait for onmetal cluster cache to sync")
+	}
+	if !o.targetCluster.GetCache().WaitForCacheSync(ctx) {
+		log.Fatal("Failed to wait for target cluster cache to sync")
 	}
 }
 
@@ -100,7 +146,7 @@ func (o *onmetalCloudProvider) Instances() (cloudprovider.Instances, bool) {
 }
 
 func (o *onmetalCloudProvider) InstancesV2() (cloudprovider.InstancesV2, bool) {
-	return nil, false
+	return o.instancesV2, true
 }
 
 func (o *onmetalCloudProvider) Zones() (cloudprovider.Zones, bool) {
@@ -108,7 +154,7 @@ func (o *onmetalCloudProvider) Zones() (cloudprovider.Zones, bool) {
 }
 
 func (o *onmetalCloudProvider) Clusters() (cloudprovider.Clusters, bool) {
-	return o.clusters, true
+	return nil, false
 }
 
 func (o *onmetalCloudProvider) Routes() (cloudprovider.Routes, bool) {
@@ -116,7 +162,7 @@ func (o *onmetalCloudProvider) Routes() (cloudprovider.Routes, bool) {
 }
 
 func (o *onmetalCloudProvider) ProviderName() string {
-	return CDefaultCloudProviderName
+	return CloudProviderName
 }
 
 func (o *onmetalCloudProvider) HasClusterID() bool {

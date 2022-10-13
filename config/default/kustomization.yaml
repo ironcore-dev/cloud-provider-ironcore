@@ -4,5 +4,5 @@ namePrefix: ""
 
 resources:
   - ../rbac
-  - ../config
+#  - ../config
   - ../manager
