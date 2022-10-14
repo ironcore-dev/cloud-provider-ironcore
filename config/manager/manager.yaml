@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: onmetal-cloud-controller-manager
+  labels:
+    k8s-app: onmetal-cloud-controller-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: onmetal-cloud-controller-manager
+  template:
+    metadata:
+      labels:
+        k8s-app: onmetal-cloud-controller-manager
+    spec:
+      containers:
+        - name: manager
+          args:
+            - --cloud-provider=onmetal
+            - --cloud-config=/etc/cloud/cloud-config
+            - --kubeconfig=/etc/kubernetes/kubeconfig
+          command:
+            - /bin/onmetal-cloud-provider-manager
+          image: controller:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              cpu: 100m
+          volumeMounts:
+            - mountPath: /etc/kubernetes
+              name: kubeconfig
+              readOnly: true
+            - mountPath: /etc/cloud
+              name: cloud-config
+              readOnly: true
+      volumes:
+        - secret:
+            secretName: cloud-config
+            items:
+              - key: cloud-config
+                path: cloud-config
+          name: cloud-config
+        - secret:
+            secretName: kubeconfig
+          name: kubeconfig
+      tolerations:
+        - key: node.cloudprovider.kubernetes.io/uninitialized
+          value: "true"
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+      serviceAccountName: cloud-controller-manager

@@ -1,0 +1,37 @@
+apiVersion: v1
+items:
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      name: occm
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: Role
+      name: extension-apiserver-authentication-reader
+    subjects:
+      - kind: ServiceAccount
+        name: cloud-controller-manager
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      name: occm-sa
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: Role
+      name: occm
+    subjects:
+      - kind: ServiceAccount
+        name: cloud-controller-manager
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      name: occm-leader-election
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: Role
+      name: occm-leader-election-role
+    subjects:
+      - kind: ServiceAccount
+        name: cloud-controller-manager
+kind: List
+metadata: {}

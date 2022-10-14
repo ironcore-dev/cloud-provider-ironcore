@@ -22,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -38,7 +39,10 @@ func newOnmetalInstancesV2(onmetalClient client.Client, targetClient client.Clie
 }
 
 func (o *onmetalInstancesV2) InstanceExists(ctx context.Context, node *corev1.Node) (bool, error) {
-
+	if node == nil {
+		return false, nil
+	}
+	klog.V(4).Infof("Checking if instance exists for node: %s", node.Name)
 	_, err := GetMachineForNode(ctx, o.onmetalClient, o.targetClient, node)
 	if apierrors.IsNotFound(err) {
 		return false, cloudprovider.InstanceNotFound
@@ -53,6 +57,7 @@ func (o *onmetalInstancesV2) InstanceShutdown(ctx context.Context, node *corev1.
 	if node == nil {
 		return false, nil
 	}
+	klog.V(4).Infof("Checking if instance is shut down for node: %s", node.Name)
 	machine, err := GetMachineForNode(ctx, o.onmetalClient, o.targetClient, node)
 	if apierrors.IsNotFound(err) {
 		return false, cloudprovider.InstanceNotFound

@@ -25,3 +25,5 @@ dist/
 *.swo
 *~
 dev/
+config/kind/kubeconfig
+config/kind/cloud-config

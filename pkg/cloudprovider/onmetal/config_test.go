@@ -24,7 +24,7 @@ import (
 var _ = Describe("Instances", func() {
 	const (
 		kubeconfigSample = `---
-onmetalClusterKubeconfig: | 
+kubeconfig: | 
   apiVersion: v1
   clusters:
   - cluster:
@@ -50,7 +50,6 @@ onmetalClusterKubeconfig: |
 		reader := strings.NewReader(kubeconfigSample)
 		config, err := NewConfig(reader)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(config.namespace).To(BeZero())
-		Expect(config.onmetalRestConfig).NotTo(BeNil())
+		Expect(config.restConfig).NotTo(BeNil())
 	})
 })

@@ -132,7 +132,7 @@ var _ = BeforeSuite(func() {
 	defer func() {
 		_ = cloudConfigFile.Close()
 	}()
-	cloudConfig := CloudConfig{OnmetalClusterKubeconfig: string(kubeconfigData)}
+	cloudConfig := CloudConfig{Kubeconfig: string(kubeconfigData)}
 	cloudConfigData, err := yaml.Marshal(&cloudConfig)
 	Expect(err).NotTo(HaveOccurred())
 

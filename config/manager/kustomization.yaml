@@ -1,2 +1,2 @@
 resources:
-  - daemonset.yaml
+  - manager.yaml
