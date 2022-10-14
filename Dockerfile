@@ -29,7 +29,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
-COPY --from=builder /workspace/manager .
+COPY --from=builder /workspace/manager /bin/onmetal-cloud-provider-manager
 USER 65532:65532
 
-ENTRYPOINT ["/manager"]
+ENTRYPOINT ["/bin/onmetal-cloud-provider-manager"]

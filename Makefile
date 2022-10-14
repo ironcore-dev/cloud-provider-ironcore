@@ -54,6 +54,35 @@ docker-build:
 docker-push:
 	docker push $(IMG)
 
+##@ Kind Deployment plumbing
+
+.PHONY: kind-load-controller
+kind-load-controller: ## Load the controller image into the kind cluster.
+	kind load docker-image controller
+
+.PHONY: kind-apply
+kind-apply: ## Apply the config in kind. Caution: Without loading the images, the pods won't come up. Use kind-deploy for a deployment including loading the images.
+#	kind get kubeconfig > ./config/kind/kubeconfig
+	kubectl apply -k config/kind
+
+.PHONY: kind-delete
+kind-delete: ## Delete the config from kind.
+	kubectl delete -k config/kind
+
+.PHONY: kind-deploy
+kind-deploy: kind-build-load-restart-cloud-controller kind-apply ## Build and load the cloud controller into the kind cluster, then apply the config. Restarts cloud controller if they were present.
+
+.PHONY: kind-build-load-restart-cloud-controller
+kind-build-load-restart-cloud-controller: kind-build-cloud-controller kind-load-controller kind-restart-cloud-controller ## Build, load and restart the controller in kind. Restart is useless if the manifests are not in place (deployed e.g. via kind-apply / kind-deploy).
+
+.PHONY: kind-restart-cloud-controller
+kind-restart-cloud-controller: ## Restart the controller in kind. Useless if the manifests are not in place (deployed e.g. via kind-apply / kind-deploy).
+	kubectl -n onmetal-system delete rs -l k8s-app=onmetal-cloud-controller-manager
+
+.PHONY: kind-build-controller
+kind-build-cloud-controller: ## Build the cloud controller for usage in kind.
+	docker build -t controller .
+
 .PHONY: clean
 clean:
 	rm -rf ./dist/

@@ -24,6 +24,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -40,6 +41,7 @@ func newOnmetalInstances(onmetalClient client.Client, targetClient client.Client
 }
 
 func (o *onmetalInstances) NodeAddresses(ctx context.Context, nodeName types.NodeName) ([]corev1.NodeAddress, error) {
+	klog.V(4).Infof("Getting node address for node: %s", nodeName)
 	machine, err := GetMachineForNodeName(ctx, o.onmetalClient, o.targetClient, nodeName)
 	if apierrors.IsNotFound(err) {
 		return nil, cloudprovider.InstanceNotFound
@@ -71,6 +73,7 @@ func (o *onmetalInstances) NodeAddresses(ctx context.Context, nodeName types.Nod
 }
 
 func (o *onmetalInstances) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]corev1.NodeAddress, error) {
+	klog.V(4).Infof("Getting node address for providerID: %s", providerID)
 	machine, err := GetMachineForProviderID(ctx, o.onmetalClient, providerID)
 	if apierrors.IsNotFound(err) {
 		return []corev1.NodeAddress{}, cloudprovider.InstanceNotFound
@@ -82,6 +85,7 @@ func (o *onmetalInstances) NodeAddressesByProviderID(ctx context.Context, provid
 }
 
 func (o *onmetalInstances) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
+	klog.V(4).Infof("Getting instanceID for node: %s", nodeName)
 	machine, err := GetMachineForNodeName(ctx, o.onmetalClient, o.targetClient, nodeName)
 	if apierrors.IsNotFound(err) {
 		return "", cloudprovider.InstanceNotFound
@@ -93,6 +97,7 @@ func (o *onmetalInstances) InstanceID(ctx context.Context, nodeName types.NodeNa
 }
 
 func (o *onmetalInstances) InstanceType(ctx context.Context, nodeName types.NodeName) (string, error) {
+	klog.V(4).Infof("Getting instance type for node: %s", nodeName)
 	machine, err := GetMachineForNodeName(ctx, o.onmetalClient, o.targetClient, nodeName)
 	if apierrors.IsNotFound(err) {
 		return "", cloudprovider.InstanceNotFound
@@ -104,6 +109,7 @@ func (o *onmetalInstances) InstanceType(ctx context.Context, nodeName types.Node
 }
 
 func (o *onmetalInstances) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
+	klog.V(4).Infof("Getting instance type for providerID: %s", providerID)
 	return o.InstanceType(ctx, types.NodeName(getMachineUIDFromProviderID(providerID)))
 }
 
@@ -116,6 +122,7 @@ func (o *onmetalInstances) CurrentNodeName(_ context.Context, hostName string) (
 }
 
 func (o *onmetalInstances) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
+	klog.V(4).Infof("Checking if instance exists for providerID: %s", providerID)
 	_, err := GetMachineForProviderID(ctx, o.onmetalClient, providerID)
 	if apierrors.IsNotFound(err) {
 		return false, cloudprovider.InstanceNotFound
@@ -127,6 +134,7 @@ func (o *onmetalInstances) InstanceExistsByProviderID(ctx context.Context, provi
 }
 
 func (o *onmetalInstances) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+	klog.V(4).Infof("Checking if instance with providerID %s is shut down", providerID)
 	machine, err := GetMachineForProviderID(ctx, o.onmetalClient, providerID)
 	if apierrors.IsNotFound(err) {
 		return false, cloudprovider.InstanceNotFound

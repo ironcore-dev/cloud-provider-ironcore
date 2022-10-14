@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 )
@@ -48,6 +49,8 @@ type onmetalCloudProvider struct {
 }
 
 func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
+	klog.V(2).Infof("Setting up cloud provider: %s", CloudProviderName)
+
 	cfg, err := NewConfig(config)
 	if err != nil {
 		return nil, errors.Wrap(err, "can't decode yaml config")
@@ -66,7 +69,7 @@ func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
 		return nil, errors.Wrap(err, "unable to add onmetal networking api to scheme")
 	}
 
-	onmetalCluster, err := cluster.New(cfg.onmetalRestConfig, func(o *cluster.Options) {
+	onmetalCluster, err := cluster.New(cfg.restConfig, func(o *cluster.Options) {
 		o.Scheme = scheme.Scheme
 	})
 	if err != nil {
@@ -79,6 +82,8 @@ func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
 	routes := newOnmetalRoutes(onmetalClient)
 	zones := newOnmetalZones(onmetalClient)
 
+	klog.V(2).Infof("Successfully setup cloud provider: %s", CloudProviderName)
+
 	return &onmetalCloudProvider{
 		onmetalCluster: onmetalCluster,
 		loadBalancer:   loadBalancer,
@@ -88,6 +93,7 @@ func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
 }
 
 func (o *onmetalCloudProvider) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+	klog.V(2).Infof("Initializing cloud provider: %s", CloudProviderName)
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		defer cancel()
@@ -135,6 +141,7 @@ func (o *onmetalCloudProvider) Initialize(clientBuilder cloudprovider.Controller
 	if !o.targetCluster.GetCache().WaitForCacheSync(ctx) {
 		log.Fatal("Failed to wait for target cluster cache to sync")
 	}
+	klog.V(2).Infof("Successfully initialized cloud provider: %s", CloudProviderName)
 }
 
 func (o *onmetalCloudProvider) LoadBalancer() (cloudprovider.LoadBalancer, bool) {

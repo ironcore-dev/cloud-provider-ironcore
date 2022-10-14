@@ -1,0 +1,18 @@
+namespace: kube-system
+
+resources:
+  - ../default
+  - ../rbac
+
+patchesStrategicMerge:
+  - patch-manager.yaml
+
+# cluster api + infra is essentially the same environment (kind cluster)
+secretGenerator:
+  - name: kubeconfig
+    files:
+      - kubeconfig
+  - name: cloud-config
+    files:
+      - cloud-config
+

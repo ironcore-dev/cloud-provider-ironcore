@@ -1,8 +1,7 @@
 namespace: kube-system
 
-namePrefix: ""
-
 resources:
-  - ../rbac
+#  - ../rbac
 #  - ../config
   - ../manager
+

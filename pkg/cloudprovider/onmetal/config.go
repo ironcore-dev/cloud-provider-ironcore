@@ -21,19 +21,20 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
 )
 
 type onmetalCloudProviderConfig struct {
-	onmetalRestConfig *rest.Config
-	namespace         string
+	restConfig *rest.Config
 }
 
 type CloudConfig struct {
-	OnmetalClusterKubeconfig string `json:"onmetalClusterKubeconfig"`
+	Kubeconfig string `json:"kubeconfig"`
 }
 
 func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
+	klog.V(2).Infof("Reading configuration for cloud provider: %s", CloudProviderName)
 	configBytes, err := io.ReadAll(f)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to read in config")
@@ -44,11 +45,11 @@ func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
 		return nil, fmt.Errorf("failed to unmarshal cloud config: %w", err)
 	}
 
-	if cloudConfig.OnmetalClusterKubeconfig == "" {
+	if cloudConfig.Kubeconfig == "" {
 		return nil, fmt.Errorf("no kubeconfig for the onmetal cluster provided")
 	}
 
-	kubeConfig, err := clientcmd.Load([]byte(cloudConfig.OnmetalClusterKubeconfig))
+	kubeConfig, err := clientcmd.Load([]byte(cloudConfig.Kubeconfig))
 	if err != nil {
 		return nil, fmt.Errorf("unable to read onmetal cluster kubeconfig: %w", err)
 	}
@@ -56,12 +57,14 @@ func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to serialize onmetal cluster kubeconfig: %w", err)
 	}
-	onmetalClusterRestConfig, err := clientConfig.ClientConfig()
+	restConfig, err := clientConfig.ClientConfig()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get onmetal cluster rest config: %w", err)
 	}
 
+	klog.V(2).Infof("Successfully read configuration for cloud provider: %s", CloudProviderName)
+
 	return &onmetalCloudProviderConfig{
-		onmetalRestConfig: onmetalClusterRestConfig,
+		restConfig: restConfig,
 	}, nil
 }
