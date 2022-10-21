@@ -100,9 +100,6 @@ var _ = Describe("Instances", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: machine.Name,
 			},
-			Spec: corev1.NodeSpec{
-				ProviderID: fmt.Sprintf("%s://%s", CloudProviderName, machine.UID),
-			},
 		}
 		Expect(k8sClient.Create(ctx, node)).To(Succeed())
 
@@ -186,7 +183,7 @@ var _ = Describe("Instances", func() {
 		const wrongInstanceID = "12345"
 		node := &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "my-node-",
+				GenerateName: "my-node-", // no matching machine should be available
 			},
 			Spec: corev1.NodeSpec{
 				ProviderID: fmt.Sprintf("%s://%s", wrongProvider, wrongInstanceID),
@@ -246,7 +243,7 @@ var _ = Describe("Instances", func() {
 		const wrongInstanceID = "12345"
 		node := &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "my-node-",
+				GenerateName: "my-node-", // no matching machine should be available
 			},
 			Spec: corev1.NodeSpec{
 				ProviderID: fmt.Sprintf("%s://%s", CloudProviderName, wrongInstanceID),

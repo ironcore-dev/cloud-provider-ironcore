@@ -17,9 +17,8 @@ package onmetal
 import (
 	"context"
 	"fmt"
-	"strings"
 
-	"github.com/onmetal/onmetal-api/apis/compute/v1alpha1"
+	computev1alpha1 "github.com/onmetal/onmetal-api/apis/compute/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -27,9 +26,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func GetMachineForProviderID(ctx context.Context, c client.Client, providerID string) (*v1alpha1.Machine, error) {
+func GetMachineForProviderID(ctx context.Context, c client.Client, providerID string) (*computev1alpha1.Machine, error) {
 	machineUID := getMachineUIDFromProviderID(providerID)
-	machineList := &v1alpha1.MachineList{}
+	machineList := &computev1alpha1.MachineList{}
 	if err := c.List(ctx, machineList, client.MatchingFields{
 		machineMetadataUIDField: machineUID,
 	}); err != nil {
@@ -37,7 +36,7 @@ func GetMachineForProviderID(ctx context.Context, c client.Client, providerID st
 	}
 	switch len(machineList.Items) {
 	case 0:
-		return nil, apierrors.NewNotFound(v1alpha1.Resource("machines"), fmt.Sprintf("UID: %s", machineUID))
+		return nil, apierrors.NewNotFound(computev1alpha1.Resource("machines"), fmt.Sprintf("UID: %s", machineUID))
 	case 1:
 		return &machineList.Items[0], nil
 	default:
@@ -45,48 +44,21 @@ func GetMachineForProviderID(ctx context.Context, c client.Client, providerID st
 	}
 }
 
-func GetMachineForNode(ctx context.Context, onmetalClient client.Client, targetClient client.Client, node *corev1.Node) (*v1alpha1.Machine, error) {
+func GetMachineForNode(ctx context.Context, onmetalClient client.Client, namespace string, node *corev1.Node) (*computev1alpha1.Machine, error) {
 	if node == nil {
 		return nil, nil
 	}
-	machine, err := GetMachineForNodeName(ctx, onmetalClient, targetClient, types.NodeName(node.Name))
-	if err != nil {
-		return nil, err
-	}
-	return machine, err
+	return GetMachineForNodeName(ctx, onmetalClient, namespace, types.NodeName(node.Name))
 }
 
-func GetMachineForNodeName(ctx context.Context, onmetalClient client.Client, targetClient client.Client, nodeName types.NodeName) (*v1alpha1.Machine, error) {
-	node, err := GetValidNodeForNodeName(ctx, targetClient, nodeName)
+func GetMachineForNodeName(ctx context.Context, client client.Client, namespace string, nodeName types.NodeName) (*computev1alpha1.Machine, error) {
+	machine := &computev1alpha1.Machine{}
+	err := client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: string(nodeName)}, machine)
 	if apierrors.IsNotFound(err) {
 		return nil, cloudprovider.InstanceNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
-	if node == nil {
-		return nil, cloudprovider.InstanceNotFound
-	}
-	return GetMachineForProviderID(ctx, onmetalClient, node.Spec.ProviderID)
-}
-
-func GetValidNodeForNodeName(ctx context.Context, targetClient client.Client, nodeName types.NodeName) (*corev1.Node, error) {
-	node := &corev1.Node{}
-	err := targetClient.Get(ctx, types.NamespacedName{Name: string(nodeName)}, node)
-	if apierrors.IsNotFound(err) {
-		return nil, cloudprovider.InstanceNotFound
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to get node object %s: %w", nodeName, err)
-	}
-
-	if !IsValidProviderID(node.Spec.ProviderID) {
-		// ignore invalid or empty provider IDs
-		return nil, cloudprovider.InstanceNotFound
-	}
-	return node, nil
-}
-
-func IsValidProviderID(id string) bool {
-	return strings.HasPrefix(id, CloudProviderName)
+	return machine, nil
 }

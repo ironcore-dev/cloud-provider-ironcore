@@ -23,7 +23,9 @@ import (
 
 var _ = Describe("Instances", func() {
 	const (
-		kubeconfigSample = `---
+		kubeconfigWrongSample = `---`
+		kubeconfigSample      = `---
+namespace: abcd
 kubeconfig: | 
   apiVersion: v1
   clusters:
@@ -46,10 +48,18 @@ kubeconfig: |
       client-key-data: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcEFJQkFBS0NBUUVBdXgzWUhkOElyRThGNTVVbzliS2w2bXQwb3pwVHFaUGpjSXJFWnpxakY4NjhEK05YCjNIOGtPMjdYNHJjMTlBMit0dmI4aVFpaDdTd1dRc0VGdnNaTTNwMEJLbEhnZjJDc3VzNVpCcU1vdE1rUjVZRDMKSVdGSFpKWXd3WGZoU0grWXBhL2NBTnFibTZONkNSdm9ubHVLWFlEYk9DbE9ON1VsbGdFVHhXRkpKSEM4bzQ2TAprVWFuWWZlWTlQSndNVlJBd0lJVWFXZE02cm5mS29UY0h2SjRNVWdqL2JKUm5YUDhqWGVucEU2QUdGUlpKT1RZCmdwQWk5K2IwWFg1ZlM1dE1BOHphbDNla29yUEQrSEJMK2VKbFVaN0dZRzJ3bzRpc3QvSUFWZjFoVEZReGFYSFIKd0Fzcnc0M2xmU3g3eTRjTlNmN0UvUDU3OVgzM29aZ2NvRjd0ZlFJREFRQUJBb0lCQUFHaTBDbnFza3UzWVNqVwpNQVo5Nmw5elV4QytTTTc1d1FwUjNFZSt4b0JGeVhVbUdyV04wd1pHQU5NMW9ONGlaS0Y2NVZoWlgva1A0cDN3CnpCa1A2TW9sZTBZZ2N5TUorRmlseHpkOG83VjQ4SlFlSFlzSUs3U2diNHF4ZnFIQW85Z0hBcGhyVU9MNmVlMnMKZGNzMHA3QUxtVjhUVldDOVQ3ZlJDSmc0TW9pRUEvNXZtK3FXZHlFLzFLSEdvbG1vSkx4clN1VlI5KytwZVhTOQptcWhRVGZtblNKcWs0RnhPNXRKd01YQnhmejg2MEJWbXlLQ3BLTlQzWVJDbFZBbVlqRlZrc1BMSnlQZWpNTzNDCnRiUVRybHZGL1lCWmlXMW5GeHY0OUtUdThoY0hvcXdrYVhJd0VOTUxVbEVHbE8rTUNrS3pNY0V6Umk0VkdsamwKSENMeFJ1RUNnWUVBMmI1ZXh3T2FmcXE3LzVvZVQzNGdkTVlIaDlqVHQvN0dqc0cxRjVTSThHWUNLcWd6ZHBCVApCZnh3WHhZNFBmZ2gzYkxNUFNobFRod20vVHVvUlE5a0w3cTJGSVp4MHlrYVNwVU9PbmFndVRFRVFoZHRXYUtjCmdNdHh0R2RacnJocU1oTmJ0cVFiNGxFbWliVlhqcXh5V1I5SjA2NUZtS3JyZlQyc1h4RHVlaGtDZ1lFQTIvM3YKdU5sei9mUUM2WUN2YjZZR2YxUkVXVnZyQ016d2xLdGFpU2dqdEgxclkwQklXUFZWTFY0VythT1BlTUVDRjBYcwp6MjBHM3FHVFJqTVZyMzJoQnQzYVRwQjR2MnBXcHZzQUJLYlRrblZWbDFnc3EzaHREMDFyNnBYcVJ1cTEyN0dqCkJkZkwvSTJYY3R1SS9ncUtTbVhzbGYxbG5sUkdWY0dKNGl3U1F3VUNnWUVBdCtrOU1DYnhCTys4WG9XVCtGeDEKbVd2eHpHSHRZVWxGK0NuUWhSd21GYlp6T2doYmYxY2phTGp4U0w4QnZnV294UkpSdzQ0dEVxNWdtQjhkWDBkQwp2YldjT1BYZGloYjdaK2RCMzB0M01UUWZmcHMrOXlpTHU1VWFjdCtnTmh6NVJWWm9ibmxxTzl1REMya3BqUTVHCmZ0UVlqVHh5K0NIVlNURWdPQ09hNlhFQ2dZRUFsYmIrd3dVeVBEMHBFakppc3BBQjBmdk9QQ1lqRVMwditXMlkKUXNtUGF4RUQyVnJ4SWFGczQyQXFNS0NRVG5URDhJVEZBZkZJQUpGamdoM1gvME4zS0E0cHVOZjNaUVdBalVrNgpuTy9RQXRkWmRaTXJhMUtjbmhKcGhBK2NqY0RFSFF5S1RycXE5MmlCRGtpN3RYQUU1MWJ3S0s5M3pjVzZ6RGZYCmw1VzRvK1VDZ1lBT1hYNkxYbXJ0aFI5c0RRa2RzMFkzK0sxS2xKbGU4WlFzbzJzbk5NbHE5a2pYVVFkR3BhanYKRU5CdHV0alMyaTFPbm9weEoxTVJPUzRUa2Z4TDRjZHoydjJYbUxXRUhNemtvVGdEOU1tS1lrdGd4ZStUWXdnUQo2MjVJK3N2c0ptR0xHZHE0aGNxaU9jNDdrTFl3RnozTkRBQXkvR0xSWUVBV0w1ajF1cE9Ub2c9PQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo=`
 	)
 
-	It("Should get instance info", func() {
+	It("Should read cloud config", func() {
 		reader := strings.NewReader(kubeconfigSample)
 		config, err := NewConfig(reader)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(config.restConfig).NotTo(BeNil())
+		Expect(config.RestConfig).NotTo(BeNil())
+		Expect(config.Namespace).NotTo(BeNil())
+	})
+
+	It("Should fail on empty cloud config", func() {
+		reader := strings.NewReader(kubeconfigWrongSample)
+		config, err := NewConfig(reader)
+		Expect(err).To(HaveOccurred())
+		Expect(config).To(BeNil())
 	})
 })

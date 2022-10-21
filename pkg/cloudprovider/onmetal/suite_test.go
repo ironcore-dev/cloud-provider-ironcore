@@ -30,7 +30,6 @@ import (
 	"github.com/onmetal/onmetal-api/envtestutils/apiserver"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -42,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -117,38 +117,6 @@ var _ = BeforeSuite(func() {
 	DeferCleanup(apiSrv.Stop)
 
 	Expect(envtestutils.WaitUntilAPIServicesReadyWithTimeout(apiServiceTimeout, testEnvExt, k8sClient, scheme.Scheme)).To(Succeed())
-
-	user, err := testEnv.AddUser(envtest.User{
-		Name:   "dummy",
-		Groups: []string{"system:authenticated", "system:masters"},
-	}, nil)
-	Expect(err).NotTo(HaveOccurred())
-
-	kubeconfigData, err := user.KubeConfig()
-	Expect(err).NotTo(HaveOccurred())
-
-	cloudConfigFile, err := os.CreateTemp(GinkgoT().TempDir(), "cloud.yaml")
-	Expect(err).NotTo(HaveOccurred())
-	defer func() {
-		_ = cloudConfigFile.Close()
-	}()
-	cloudConfig := CloudConfig{Kubeconfig: string(kubeconfigData)}
-	cloudConfigData, err := yaml.Marshal(&cloudConfig)
-	Expect(err).NotTo(HaveOccurred())
-
-	Expect(os.WriteFile(cloudConfigFile.Name(), cloudConfigData, 0666)).To(Succeed())
-
-	provider, err = InitCloudProvider(cloudConfigFile)
-	Expect(err).NotTo(HaveOccurred())
-
-	ctx, cancel := context.WithCancel(context.Background())
-	DeferCleanup(cancel)
-
-	k8sClientSet, err := kubernetes.NewForConfig(cfg)
-	Expect(err).NotTo(HaveOccurred())
-
-	clientBuilder := clientbuilder.NewDynamicClientBuilder(testEnv.Config, k8sClientSet.CoreV1(), "default")
-	provider.Initialize(clientBuilder, ctx.Done())
 })
 
 func SetupTest(ctx context.Context) *corev1.Namespace {
@@ -160,6 +128,38 @@ func SetupTest(ctx context.Context) *corev1.Namespace {
 		}
 		Expect(k8sClient.Create(ctx, ns)).NotTo(HaveOccurred(), "failed to create test namespace")
 		DeferCleanup(k8sClient.Delete, ctx, ns)
+
+		user, err := testEnv.AddUser(envtest.User{
+			Name:   "dummy",
+			Groups: []string{"system:authenticated", "system:masters"},
+		}, nil)
+		Expect(err).NotTo(HaveOccurred())
+
+		kubeconfigData, err := user.KubeConfig()
+		Expect(err).NotTo(HaveOccurred())
+
+		cloudConfigFile, err := os.CreateTemp(GinkgoT().TempDir(), "cloud.yaml")
+		Expect(err).NotTo(HaveOccurred())
+		defer func() {
+			_ = cloudConfigFile.Close()
+		}()
+		cloudConfig := CloudConfig{Namespace: ns.Name, Kubeconfig: string(kubeconfigData)}
+		cloudConfigData, err := yaml.Marshal(&cloudConfig)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(os.WriteFile(cloudConfigFile.Name(), cloudConfigData, 0666)).To(Succeed())
+
+		provider, err = InitCloudProvider(cloudConfigFile)
+		Expect(err).NotTo(HaveOccurred())
+
+		ctx, cancel := context.WithCancel(context.Background())
+		DeferCleanup(cancel)
+
+		k8sClientSet, err := kubernetes.NewForConfig(cfg)
+		Expect(err).NotTo(HaveOccurred())
+
+		clientBuilder := clientbuilder.NewDynamicClientBuilder(testEnv.Config, k8sClientSet.CoreV1(), "default")
+		provider.Initialize(clientBuilder, ctx.Done())
 	})
 
 	return ns
