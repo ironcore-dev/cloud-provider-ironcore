@@ -29,20 +29,22 @@ import (
 )
 
 type onmetalInstances struct {
-	onmetalClient client.Client
 	targetClient  client.Client
+	onmetalClient client.Client
+	namespace     string
 }
 
-func newOnmetalInstances(onmetalClient client.Client, targetClient client.Client) cloudprovider.Instances {
+func newOnmetalInstances(targetClient client.Client, onmetalClient client.Client, namespace string) cloudprovider.Instances {
 	return &onmetalInstances{
-		onmetalClient: onmetalClient,
 		targetClient:  targetClient,
+		onmetalClient: onmetalClient,
+		namespace:     namespace,
 	}
 }
 
 func (o *onmetalInstances) NodeAddresses(ctx context.Context, nodeName types.NodeName) ([]corev1.NodeAddress, error) {
-	klog.V(4).Infof("Getting node address for node: %s", nodeName)
-	machine, err := GetMachineForNodeName(ctx, o.onmetalClient, o.targetClient, nodeName)
+	klog.V(4).Infof("Getting node addresses for node: %s", nodeName)
+	machine, err := GetMachineForNodeName(ctx, o.onmetalClient, o.namespace, nodeName)
 	if apierrors.IsNotFound(err) {
 		return nil, cloudprovider.InstanceNotFound
 	}
@@ -86,7 +88,7 @@ func (o *onmetalInstances) NodeAddressesByProviderID(ctx context.Context, provid
 
 func (o *onmetalInstances) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	klog.V(4).Infof("Getting instanceID for node: %s", nodeName)
-	machine, err := GetMachineForNodeName(ctx, o.onmetalClient, o.targetClient, nodeName)
+	machine, err := GetMachineForNodeName(ctx, o.onmetalClient, o.namespace, nodeName)
 	if apierrors.IsNotFound(err) {
 		return "", cloudprovider.InstanceNotFound
 	}
@@ -98,7 +100,7 @@ func (o *onmetalInstances) InstanceID(ctx context.Context, nodeName types.NodeNa
 
 func (o *onmetalInstances) InstanceType(ctx context.Context, nodeName types.NodeName) (string, error) {
 	klog.V(4).Infof("Getting instance type for node: %s", nodeName)
-	machine, err := GetMachineForNodeName(ctx, o.onmetalClient, o.targetClient, nodeName)
+	machine, err := GetMachineForNodeName(ctx, o.onmetalClient, o.namespace, nodeName)
 	if apierrors.IsNotFound(err) {
 		return "", cloudprovider.InstanceNotFound
 	}

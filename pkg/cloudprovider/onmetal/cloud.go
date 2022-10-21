@@ -39,13 +39,14 @@ const (
 )
 
 type onmetalCloudProvider struct {
-	targetCluster  cluster.Cluster
-	onmetalCluster cluster.Cluster
-	loadBalancer   cloudprovider.LoadBalancer
-	instances      cloudprovider.Instances
-	instancesV2    cloudprovider.InstancesV2
-	routes         cloudprovider.Routes
-	zones          cloudprovider.Zones
+	targetCluster    cluster.Cluster
+	onmetalCluster   cluster.Cluster
+	onmetalNamespace string
+	loadBalancer     cloudprovider.LoadBalancer
+	instances        cloudprovider.Instances
+	instancesV2      cloudprovider.InstancesV2
+	routes           cloudprovider.Routes
+	zones            cloudprovider.Zones
 }
 
 func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
@@ -69,7 +70,7 @@ func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
 		return nil, errors.Wrap(err, "unable to add onmetal networking api to scheme")
 	}
 
-	onmetalCluster, err := cluster.New(cfg.restConfig, func(o *cluster.Options) {
+	onmetalCluster, err := cluster.New(cfg.RestConfig, func(o *cluster.Options) {
 		o.Scheme = scheme.Scheme
 	})
 	if err != nil {
@@ -85,10 +86,11 @@ func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
 	klog.V(2).Infof("Successfully setup cloud provider: %s", CloudProviderName)
 
 	return &onmetalCloudProvider{
-		onmetalCluster: onmetalCluster,
-		loadBalancer:   loadBalancer,
-		routes:         routes,
-		zones:          zones,
+		onmetalCluster:   onmetalCluster,
+		onmetalNamespace: cfg.Namespace,
+		loadBalancer:     loadBalancer,
+		routes:           routes,
+		zones:            zones,
 	}, nil
 }
 
@@ -108,8 +110,8 @@ func (o *onmetalCloudProvider) Initialize(clientBuilder cloudprovider.Controller
 	if err != nil {
 		log.Fatalf("Failed to create new cluster: %v", err)
 	}
-	o.instances = newOnmetalInstances(o.onmetalCluster.GetClient(), o.targetCluster.GetClient())
-	o.instancesV2 = newOnmetalInstancesV2(o.onmetalCluster.GetClient(), o.targetCluster.GetClient())
+	o.instances = newOnmetalInstances(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace)
+	o.instancesV2 = newOnmetalInstancesV2(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace)
 
 	if err := o.onmetalCluster.GetFieldIndexer().IndexField(ctx, &computev1alpha1.Machine{}, machineMetadataUIDField, func(object client.Object) []string {
 		machine := object.(*computev1alpha1.Machine)

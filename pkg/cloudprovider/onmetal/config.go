@@ -26,10 +26,12 @@ import (
 )
 
 type onmetalCloudProviderConfig struct {
-	restConfig *rest.Config
+	RestConfig *rest.Config
+	Namespace  string
 }
 
 type CloudConfig struct {
+	Namespace  string `json:"namespace"`
 	Kubeconfig string `json:"kubeconfig"`
 }
 
@@ -43,6 +45,10 @@ func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
 	cloudConfig := &CloudConfig{}
 	if err := yaml.Unmarshal(configBytes, cloudConfig); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal cloud config: %w", err)
+	}
+
+	if cloudConfig.Namespace == "" {
+		return nil, fmt.Errorf("namespace missing in cloud config")
 	}
 
 	if cloudConfig.Kubeconfig == "" {
@@ -65,6 +71,7 @@ func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
 	klog.V(2).Infof("Successfully read configuration for cloud provider: %s", CloudProviderName)
 
 	return &onmetalCloudProviderConfig{
-		restConfig: restConfig,
+		RestConfig: restConfig,
+		Namespace:  cloudConfig.Namespace,
 	}, nil
 }

@@ -15,7 +15,6 @@
 package onmetal
 
 import (
-	"fmt"
 	"net/netip"
 
 	commonv1alpha1 "github.com/onmetal/onmetal-api/apis/common/v1alpha1"
@@ -98,9 +97,6 @@ var _ = Describe("InstancesV2", func() {
 		node := &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: machine.Name,
-			},
-			Spec: corev1.NodeSpec{
-				ProviderID: fmt.Sprintf("%s://%s", CloudProviderName, machine.UID),
 			},
 		}
 		Expect(k8sClient.Create(ctx, node)).To(Succeed())

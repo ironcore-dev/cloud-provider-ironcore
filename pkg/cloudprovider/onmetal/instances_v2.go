@@ -27,14 +27,16 @@ import (
 )
 
 type onmetalInstancesV2 struct {
-	onmetalClient client.Client
-	targetClient  client.Client
+	targetClient     client.Client
+	onmetalClient    client.Client
+	onmetalNamespace string
 }
 
-func newOnmetalInstancesV2(onmetalClient client.Client, targetClient client.Client) cloudprovider.InstancesV2 {
+func newOnmetalInstancesV2(targetClient client.Client, onmetalClient client.Client, namespace string) cloudprovider.InstancesV2 {
 	return &onmetalInstancesV2{
-		onmetalClient: onmetalClient,
-		targetClient:  targetClient,
+		targetClient:     targetClient,
+		onmetalClient:    onmetalClient,
+		onmetalNamespace: namespace,
 	}
 }
 
@@ -43,7 +45,7 @@ func (o *onmetalInstancesV2) InstanceExists(ctx context.Context, node *corev1.No
 		return false, nil
 	}
 	klog.V(4).Infof("Checking if instance exists for node: %s", node.Name)
-	_, err := GetMachineForNode(ctx, o.onmetalClient, o.targetClient, node)
+	_, err := GetMachineForNode(ctx, o.onmetalClient, o.onmetalNamespace, node)
 	if apierrors.IsNotFound(err) {
 		return false, cloudprovider.InstanceNotFound
 	}
@@ -58,7 +60,7 @@ func (o *onmetalInstancesV2) InstanceShutdown(ctx context.Context, node *corev1.
 		return false, nil
 	}
 	klog.V(4).Infof("Checking if instance is shut down for node: %s", node.Name)
-	machine, err := GetMachineForNode(ctx, o.onmetalClient, o.targetClient, node)
+	machine, err := GetMachineForNode(ctx, o.onmetalClient, o.onmetalNamespace, node)
 	if apierrors.IsNotFound(err) {
 		return false, cloudprovider.InstanceNotFound
 	}
@@ -73,7 +75,7 @@ func (o *onmetalInstancesV2) InstanceMetadata(ctx context.Context, node *corev1.
 	if node == nil {
 		return nil, nil
 	}
-	machine, err := GetMachineForNode(ctx, o.onmetalClient, o.targetClient, node)
+	machine, err := GetMachineForNode(ctx, o.onmetalClient, o.onmetalNamespace, node)
 	if apierrors.IsNotFound(err) {
 		return nil, cloudprovider.InstanceNotFound
 	}
