@@ -26,10 +26,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func GetMachineForProviderID(ctx context.Context, c client.Client, providerID string) (*computev1alpha1.Machine, error) {
+func GetMachineForProviderID(ctx context.Context, c client.Client, namespace string, providerID string) (*computev1alpha1.Machine, error) {
 	machineUID := getMachineUIDFromProviderID(providerID)
 	machineList := &computev1alpha1.MachineList{}
-	if err := c.List(ctx, machineList, client.MatchingFields{
+	if err := c.List(ctx, machineList, client.InNamespace(namespace), client.MatchingFields{
 		machineMetadataUIDField: machineUID,
 	}); err != nil {
 		return nil, fmt.Errorf("failed to get machine with UID %s: %w", machineUID, err)
