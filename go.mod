@@ -7,7 +7,7 @@ require (
 	github.com/onmetal/controller-utils v0.6.3
 	github.com/onmetal/onmetal-api v0.0.13-0.20221010123301-a193b2e3df7a
 	github.com/onsi/ginkgo/v2 v2.4.0
-	github.com/onsi/gomega v1.22.1
+	github.com/onsi/gomega v1.23.0
 	github.com/pkg/errors v0.9.1
 	k8s.io/api v0.24.3
 	k8s.io/apimachinery v0.24.3
@@ -47,7 +47,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/gnostic v0.5.7-v3refs // indirect
-	github.com/google/go-cmp v0.5.8 // indirect
+	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
