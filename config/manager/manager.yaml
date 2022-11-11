@@ -16,16 +16,19 @@ spec:
     spec:
       containers:
         - name: manager
+          command:
+            - /bin/onmetal-cloud-provider-manager
           args:
             - --cloud-provider=onmetal
             - --cloud-config=/etc/cloud/cloud-config
             - --kubeconfig=/etc/kubernetes/kubeconfig
-          command:
-            - /bin/onmetal-cloud-provider-manager
+            - --authentication-kubeconfig=/etc/kubernetes/kubeconfig
+            - --authorization-kubeconfig=/etc/kubernetes/kubeconfig
+            - --use-service-account-credentials
+            - --leader-elect=true
+            - --v=2
           image: controller:latest
           imagePullPolicy: IfNotPresent
-          securityContext:
-            privileged: true
           resources:
             requests:
               cpu: 100m
