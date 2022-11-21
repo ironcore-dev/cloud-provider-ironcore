@@ -16,6 +16,7 @@ package onmetal
 
 import (
 	"context"
+	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
@@ -37,7 +38,8 @@ func (o *onmetalLoadBalancer) GetLoadBalancer(ctx context.Context, clusterName s
 }
 
 func (o *onmetalLoadBalancer) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
-	return ""
+	name := fmt.Sprintf("%s_%s", service.Namespace, service.Name)
+	return name
 }
 
 func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {

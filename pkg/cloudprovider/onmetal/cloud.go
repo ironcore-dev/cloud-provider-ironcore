@@ -20,10 +20,6 @@ import (
 	"io"
 	"log"
 
-	computev1alpha1 "github.com/onmetal/onmetal-api/apis/compute/v1alpha1"
-	ipamv1alpha1 "github.com/onmetal/onmetal-api/apis/ipam/v1alpha1"
-	networkingv1alpha1 "github.com/onmetal/onmetal-api/apis/networking/v1alpha1"
-	storagev1alpha1 "github.com/onmetal/onmetal-api/apis/storage/v1alpha1"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -31,6 +27,11 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
+
+	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
+	ipamv1alpha1 "github.com/onmetal/onmetal-api/api/ipam/v1alpha1"
+	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
+	storagev1alpha1 "github.com/onmetal/onmetal-api/api/storage/v1alpha1"
 )
 
 const (
@@ -147,7 +148,7 @@ func (o *onmetalCloudProvider) Initialize(clientBuilder cloudprovider.Controller
 }
 
 func (o *onmetalCloudProvider) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
-	return nil, false
+	return o.loadBalancer, true
 }
 
 func (o *onmetalCloudProvider) Instances() (cloudprovider.Instances, bool) {

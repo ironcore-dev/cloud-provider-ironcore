@@ -19,13 +19,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/onmetal/onmetal-api/apis/compute/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/onmetal/onmetal-api/api/compute/v1alpha1"
 )
 
 type onmetalInstances struct {
