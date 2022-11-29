@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/google/addlicense v1.0.0
 	github.com/onmetal/controller-utils v0.6.4
-	github.com/onmetal/onmetal-api v0.0.13-0.20221010123301-a193b2e3df7a
+	github.com/onmetal/onmetal-api v0.0.13-0.20221117152616-d0a906f467b4
 	github.com/onsi/ginkgo/v2 v2.5.0
 	github.com/onsi/gomega v1.24.1
 	github.com/pkg/errors v0.9.1
@@ -53,7 +53,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
-	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
@@ -67,7 +67,7 @@ require (
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/spf13/afero v1.8.2 // indirect
-	github.com/spf13/cobra v1.5.0 // indirect
+	github.com/spf13/cobra v1.6.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.etcd.io/etcd/api/v3 v3.5.4 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.4 // indirect
@@ -87,7 +87,7 @@ require (
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
 	go4.org/netipx v0.0.0-20220812043211-3cc044ffd68d // indirect
-	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4 // indirect
+	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/net v0.2.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220622183110-fd043fe589d2 // indirect
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
@@ -98,7 +98,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220822174746-9e6da59bd2fc // indirect
-	google.golang.org/grpc v1.48.0 // indirect
+	google.golang.org/grpc v1.50.1 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
