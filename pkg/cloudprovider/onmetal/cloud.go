@@ -79,7 +79,7 @@ func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
 
 	onmetalClient := onmetalCluster.GetClient()
 
-	loadBalancer := newOnmetalLoadBalancer(onmetalClient)
+	loadBalancer := newOnmetalLoadBalancer(onmetalClient, cfg.Namespace)
 	routes := newOnmetalRoutes(onmetalClient)
 	zones := newOnmetalZones(onmetalClient)
 
@@ -147,7 +147,7 @@ func (o *onmetalCloudProvider) Initialize(clientBuilder cloudprovider.Controller
 }
 
 func (o *onmetalCloudProvider) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
-	return nil, false
+	return o.loadBalancer, true
 }
 
 func (o *onmetalCloudProvider) Instances() (cloudprovider.Instances, bool) {
