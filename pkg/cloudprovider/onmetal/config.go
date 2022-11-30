@@ -26,13 +26,15 @@ import (
 )
 
 type onmetalCloudProviderConfig struct {
-	RestConfig *rest.Config
-	Namespace  string
+	RestConfig  *rest.Config
+	Namespace   string
+	NetworkName string
 }
 
 type CloudConfig struct {
-	Namespace  string `json:"namespace"`
-	Kubeconfig string `json:"kubeconfig"`
+	Namespace   string `json:"namespace"`
+	NetworkName string `json:"network-name"`
+	Kubeconfig  string `json:"kubeconfig"`
 }
 
 func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
@@ -49,6 +51,10 @@ func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
 
 	if cloudConfig.Namespace == "" {
 		return nil, fmt.Errorf("namespace missing in cloud config")
+	}
+
+	if cloudConfig.NetworkName == "" {
+		return nil, fmt.Errorf("network-name missing in cloud config")
 	}
 
 	if cloudConfig.Kubeconfig == "" {
@@ -71,7 +77,8 @@ func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
 	klog.V(2).Infof("Successfully read configuration for cloud provider: %s", CloudProviderName)
 
 	return &onmetalCloudProviderConfig{
-		RestConfig: restConfig,
-		Namespace:  cloudConfig.Namespace,
+		RestConfig:  restConfig,
+		Namespace:   cloudConfig.Namespace,
+		NetworkName: cloudConfig.NetworkName,
 	}, nil
 }

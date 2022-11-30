@@ -118,8 +118,9 @@ var _ = BeforeSuite(func() {
 	Expect(envtestutils.WaitUntilAPIServicesReadyWithTimeout(apiServiceTimeout, testEnvExt, k8sClient, scheme.Scheme)).To(Succeed())
 })
 
-func SetupTest(ctx context.Context) *corev1.Namespace {
+func SetupTest(ctx context.Context) (*corev1.Namespace, string) {
 	ns := &corev1.Namespace{}
+	networkName := "my-network"
 
 	BeforeEach(func() {
 		*ns = corev1.Namespace{
@@ -142,7 +143,7 @@ func SetupTest(ctx context.Context) *corev1.Namespace {
 		defer func() {
 			_ = cloudConfigFile.Close()
 		}()
-		cloudConfig := CloudConfig{Namespace: ns.Name, Kubeconfig: string(kubeconfigData)}
+		cloudConfig := CloudConfig{Namespace: ns.Name, NetworkName: networkName, Kubeconfig: string(kubeconfigData)}
 		cloudConfigData, err := yaml.Marshal(&cloudConfig)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -161,5 +162,5 @@ func SetupTest(ctx context.Context) *corev1.Namespace {
 		provider.Initialize(clientBuilder, ctx.Done())
 	})
 
-	return ns
+	return ns, networkName
 }

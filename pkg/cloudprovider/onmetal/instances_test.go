@@ -34,14 +34,14 @@ import (
 
 var _ = Describe("Instances", func() {
 	ctx := testutils.SetupContext()
-	ns := SetupTest(ctx)
+	ns, networkName := SetupTest(ctx)
 
 	It("Should get instance info", func() {
 		By("creating a network")
 		network := &networkingv1alpha1.Network{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "network-",
+				Namespace: ns.Name,
+				Name:      networkName,
 			},
 		}
 		Expect(k8sClient.Create(ctx, network)).To(Succeed())

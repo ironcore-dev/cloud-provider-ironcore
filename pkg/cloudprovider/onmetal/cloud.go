@@ -43,6 +43,7 @@ type onmetalCloudProvider struct {
 	targetCluster    cluster.Cluster
 	onmetalCluster   cluster.Cluster
 	onmetalNamespace string
+	networkName      string
 	loadBalancer     cloudprovider.LoadBalancer
 	instances        cloudprovider.Instances
 	instancesV2      cloudprovider.InstancesV2
@@ -80,7 +81,6 @@ func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
 
 	onmetalClient := onmetalCluster.GetClient()
 
-	loadBalancer := newOnmetalLoadBalancer(onmetalClient)
 	routes := newOnmetalRoutes(onmetalClient)
 	zones := newOnmetalZones(onmetalClient)
 
@@ -89,7 +89,7 @@ func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
 	return &onmetalCloudProvider{
 		onmetalCluster:   onmetalCluster,
 		onmetalNamespace: cfg.Namespace,
-		loadBalancer:     loadBalancer,
+		networkName:      cfg.NetworkName,
 		routes:           routes,
 		zones:            zones,
 	}, nil
@@ -113,6 +113,7 @@ func (o *onmetalCloudProvider) Initialize(clientBuilder cloudprovider.Controller
 	}
 	o.instances = newOnmetalInstances(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace)
 	o.instancesV2 = newOnmetalInstancesV2(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace)
+	o.loadBalancer = newOnmetalLoadBalancer(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace, o.networkName)
 
 	if err := o.onmetalCluster.GetFieldIndexer().IndexField(ctx, &computev1alpha1.Machine{}, machineMetadataUIDField, func(object client.Object) []string {
 		machine := object.(*computev1alpha1.Machine)
