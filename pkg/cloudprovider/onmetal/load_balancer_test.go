@@ -16,6 +16,7 @@ package onmetal
 
 import (
 	"net/netip"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -179,11 +180,10 @@ var _ = Describe("LoadBalancer", func() {
 		}
 		Expect(k8sClient.Create(ctx, network)).To(Succeed())
 
-		const uid types.UID = "2020d-e0e-47ef-wef4fr-6ytt54-ee7763d"
-		uidHash := getHashValueForUID([]byte(uid))
+		const uid types.UID = "2020de0-e47ef-wef4fr-6ytt54-ee7763d"
 
 		By("creating a LoadBalancer")
-		lbName := trimLoadBalancerName("envtest-" + "myservice-" + uidHash)
+		lbName := trimLoadBalancerName("envtest-" + "myservice-" + strings.Split(string(uid), "-")[0])
 		loadBalancer := &networkingv1alpha1.LoadBalancer{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
@@ -255,11 +255,10 @@ var _ = Describe("LoadBalancer", func() {
 		}
 		Expect(k8sClient.Create(ctx, network)).To(Succeed())
 
-		const uid types.UID = "2020d-e0e-47ef-wef4fr-6ytt54-ee7763d"
-		uidHash := getHashValueForUID([]byte(uid))
+		const uid types.UID = "2020de0-e47ef-wef4fr-6ytt54-ee7763d"
 
 		By("creating a LoadBalancer")
-		lbName := trimLoadBalancerName("envtest-" + "myservice-" + uidHash)
+		lbName := trimLoadBalancerName("envtest-" + "myservice-" + strings.Split(string(uid), "-")[0])
 		loadBalancer := &networkingv1alpha1.LoadBalancer{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,

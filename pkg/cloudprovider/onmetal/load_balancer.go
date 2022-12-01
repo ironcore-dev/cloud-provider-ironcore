@@ -16,9 +16,8 @@ package onmetal
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/onmetal/onmetal-api/api/common/v1alpha1"
@@ -83,9 +82,9 @@ func (o *onmetalLoadBalancer) GetLoadBalancer(ctx context.Context, clusterName s
 
 func (o *onmetalLoadBalancer) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
 	klog.V(4).Infof("Getting loadbalancer name with cluster name: %s, service name: %s serviceUID: %s\n", clusterName, service.Name, service.UID)
-	stringval := getHashValueForUID([]byte(service.UID))
-	name := fmt.Sprintf("%s-%s-%s", clusterName, service.Name, stringval)
-	return trimLoadBalancerName(name)
+	nameSuffix := strings.Split(string(service.UID), "-")[0]
+	lbName := fmt.Sprintf("%s-%s-%s", clusterName, service.Name, nameSuffix)
+	return trimLoadBalancerName(lbName)
 }
 
 func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
@@ -259,13 +258,6 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clu
 	}
 
 	return nil
-}
-
-// getHashValueForUID returns first 7 chars of after calculating hash of service UID
-func getHashValueForUID(uid []byte) string {
-	uidHash := sha256.Sum256(uid)
-	stringval := hex.EncodeToString(uidHash[:])
-	return stringval[0:6]
 }
 
 // trimLoadBalancerName makes sure the string length doesn't exceed 63, which is usually the maximum length for LoadBalancer name.
