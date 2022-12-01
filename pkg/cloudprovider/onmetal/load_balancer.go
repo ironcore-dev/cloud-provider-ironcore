@@ -194,7 +194,7 @@ func (o *onmetalLoadBalancer) ensureLoadBalancerRouting(ctx context.Context, loa
 	network := &networkingv1alpha1.Network{}
 	err := o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: string(o.networkName)}, network)
 	if err != nil {
-		return fmt.Errorf("failed to get network Object for %s", o.networkName)
+		return fmt.Errorf("failed to get network %s: %w", o.networkName, err)
 	}
 
 	loadBalancerRouting := &networkingv1alpha1.LoadBalancerRouting{
