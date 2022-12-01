@@ -148,7 +148,7 @@ var _ = Describe("LoadBalancer", func() {
 		}
 		Expect(k8sClient.Create(ctx, network)).To(Succeed())
 
-		lbName := getLoadBalancerName(clusterName, service)
+		lbName := loadbalancer.GetLoadBalancerName(ctx, clusterName, service)
 		By("patching public IP into loadbalancer status")
 		lb := &networkingv1alpha1.LoadBalancer{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: service.Namespace, Name: lbName}, lb)).To(Succeed())

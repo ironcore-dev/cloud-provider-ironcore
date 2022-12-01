@@ -19,9 +19,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"strings"
 	"time"
 
+	"github.com/onmetal/onmetal-api/api/common/v1alpha1"
 	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -32,8 +32,6 @@ import (
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/onmetal/onmetal-api/api/common/v1alpha1"
 )
 
 type onmetalLoadBalancer struct {
@@ -53,7 +51,7 @@ var (
 	loadbalancerFieldOwner = client.FieldOwner("cloud-provider.onmetal.de/loadbalancer")
 )
 
-func newOnmetalLoadBalancer(targetClient client.Client, onmetalClient client.Client, namespace string, namespace string, networkName string) cloudprovider.LoadBalancer {
+func newOnmetalLoadBalancer(targetClient client.Client, onmetalClient client.Client, namespace string, networkName string) cloudprovider.LoadBalancer {
 	return &onmetalLoadBalancer{
 		targetClient:     targetClient,
 		onmetalClient:    onmetalClient,
@@ -99,7 +97,7 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 	}
 
 	klog.V(4).Info("EnsureLoadBalancer - get loadbalancer name")
-	lbName := getLoadBalancerName(clusterName, service)
+	lbName := o.GetLoadBalancerName(ctx, clusterName, service)
 
 	klog.V(4).Info("EnsureLoadBalancer - get service ports and protocols")
 	lbPorts := []networkingv1alpha1.LoadBalancerPort{}
@@ -159,11 +157,6 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 	}
 
 	return &v1.LoadBalancerStatus{Ingress: lbIngress}, nil
-}
-
-func getLoadBalancerName(clusterName string, service *v1.Service) string {
-	nameSuffix := strings.Split(string(service.UID), "-")[0]
-	return fmt.Sprintf("%s-%s-%s", clusterName, service.Name, nameSuffix)
 }
 
 func WaitLoadbalancerActive(ctx context.Context, clusterName string, service *v1.Service, onmetalClient client.Client, loadBalancer *networkingv1alpha1.LoadBalancer) error {
@@ -251,7 +244,7 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clu
 	lbName := o.GetLoadBalancerName(ctx, clusterName, service)
 	klog.V(4).Infof("Deleting loadbalancer instance with name: ", lbName)
 	loadBalancer := &networkingv1alpha1.LoadBalancer{}
-	err := o.Client.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: string(lbName)}, loadBalancer)
+	err := o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: string(lbName)}, loadBalancer)
 
 	if apierrors.IsNotFound(err) {
 		return cloudprovider.InstanceNotFound
@@ -260,7 +253,7 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clu
 		return err
 	}
 
-	err = o.Client.Delete(ctx, loadBalancer)
+	err = o.onmetalClient.Delete(ctx, loadBalancer)
 	if err != nil {
 		return err
 	}
