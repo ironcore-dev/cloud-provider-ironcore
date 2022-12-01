@@ -134,7 +134,7 @@ var _ = Describe("LoadBalancer", func() {
 		By("failing when network object is not found")
 		Eventually(func(g Gomega) {
 			_, err := loadbalancer.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})
-			g.Expect(err).Should(MatchError("failed to get network Object for " + networkName))
+			g.Expect(err).Should(MatchError("failed to get network my-network: Network.networking.api.onmetal.de \"my-network\" not found"))
 		}).Should(Succeed())
 
 		By("creating a network")
