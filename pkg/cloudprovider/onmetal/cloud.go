@@ -20,10 +20,6 @@ import (
 	"io"
 	"log"
 
-	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
-	ipamv1alpha1 "github.com/onmetal/onmetal-api/api/ipam/v1alpha1"
-	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
-	storagev1alpha1 "github.com/onmetal/onmetal-api/api/storage/v1alpha1"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -31,6 +27,11 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
+
+	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
+	ipamv1alpha1 "github.com/onmetal/onmetal-api/api/ipam/v1alpha1"
+	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
+	storagev1alpha1 "github.com/onmetal/onmetal-api/api/storage/v1alpha1"
 )
 
 const (
@@ -42,6 +43,7 @@ type onmetalCloudProvider struct {
 	targetCluster    cluster.Cluster
 	onmetalCluster   cluster.Cluster
 	onmetalNamespace string
+	networkName      string
 	loadBalancer     cloudprovider.LoadBalancer
 	instances        cloudprovider.Instances
 	instancesV2      cloudprovider.InstancesV2
@@ -79,7 +81,6 @@ func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
 
 	onmetalClient := onmetalCluster.GetClient()
 
-	loadBalancer := newOnmetalLoadBalancer(onmetalClient, cfg.Namespace)
 	routes := newOnmetalRoutes(onmetalClient)
 	zones := newOnmetalZones(onmetalClient)
 
@@ -88,7 +89,7 @@ func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
 	return &onmetalCloudProvider{
 		onmetalCluster:   onmetalCluster,
 		onmetalNamespace: cfg.Namespace,
-		loadBalancer:     loadBalancer,
+		networkName:      cfg.NetworkName,
 		routes:           routes,
 		zones:            zones,
 	}, nil
@@ -112,6 +113,7 @@ func (o *onmetalCloudProvider) Initialize(clientBuilder cloudprovider.Controller
 	}
 	o.instances = newOnmetalInstances(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace)
 	o.instancesV2 = newOnmetalInstancesV2(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace)
+	o.loadBalancer = newOnmetalLoadBalancer(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace, o.networkName)
 
 	if err := o.onmetalCluster.GetFieldIndexer().IndexField(ctx, &computev1alpha1.Machine{}, machineMetadataUIDField, func(object client.Object) []string {
 		machine := object.(*computev1alpha1.Machine)

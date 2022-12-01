@@ -26,6 +26,7 @@ var _ = Describe("Instances", func() {
 		kubeconfigWrongSample = `---`
 		kubeconfigSample      = `---
 namespace: abcd
+networkname: my-network
 kubeconfig: | 
   apiVersion: v1
   clusters:
@@ -54,6 +55,7 @@ kubeconfig: |
 		Expect(err).NotTo(HaveOccurred())
 		Expect(config.RestConfig).NotTo(BeNil())
 		Expect(config.Namespace).NotTo(BeNil())
+		Expect(config.NetworkName).NotTo(BeNil())
 	})
 
 	It("Should fail on empty cloud config", func() {
