@@ -20,14 +20,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onmetal/controller-utils/buildutils"
-	"github.com/onmetal/controller-utils/modutils"
-	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
-	ipamv1alpha1 "github.com/onmetal/onmetal-api/api/ipam/v1alpha1"
-	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
-	storagev1alpha1 "github.com/onmetal/onmetal-api/api/storage/v1alpha1"
-	"github.com/onmetal/onmetal-api/testutils/envtestutils"
-	"github.com/onmetal/onmetal-api/testutils/envtestutils/apiserver"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -42,6 +34,15 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/yaml"
+
+	"github.com/onmetal/controller-utils/buildutils"
+	"github.com/onmetal/controller-utils/modutils"
+	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
+	ipamv1alpha1 "github.com/onmetal/onmetal-api/api/ipam/v1alpha1"
+	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
+	storagev1alpha1 "github.com/onmetal/onmetal-api/api/storage/v1alpha1"
+	"github.com/onmetal/onmetal-api/testutils/envtestutils"
+	"github.com/onmetal/onmetal-api/testutils/envtestutils/apiserver"
 )
 
 var (
@@ -117,8 +118,9 @@ var _ = BeforeSuite(func() {
 	Expect(envtestutils.WaitUntilAPIServicesReadyWithTimeout(apiServiceTimeout, testEnvExt, k8sClient, scheme.Scheme)).To(Succeed())
 })
 
-func SetupTest(ctx context.Context) *corev1.Namespace {
+func SetupTest(ctx context.Context) (*corev1.Namespace, string) {
 	ns := &corev1.Namespace{}
+	networkName := "my-network"
 
 	BeforeEach(func() {
 		*ns = corev1.Namespace{
@@ -141,7 +143,7 @@ func SetupTest(ctx context.Context) *corev1.Namespace {
 		defer func() {
 			_ = cloudConfigFile.Close()
 		}()
-		cloudConfig := CloudConfig{Namespace: ns.Name, Kubeconfig: string(kubeconfigData)}
+		cloudConfig := CloudConfig{Namespace: ns.Name, NetworkName: networkName, Kubeconfig: string(kubeconfigData)}
 		cloudConfigData, err := yaml.Marshal(&cloudConfig)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -160,5 +162,5 @@ func SetupTest(ctx context.Context) *corev1.Namespace {
 		provider.Initialize(clientBuilder, ctx.Done())
 	})
 
-	return ns
+	return ns, networkName
 }
