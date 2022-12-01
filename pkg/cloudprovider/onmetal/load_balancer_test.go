@@ -16,7 +16,6 @@ package onmetal
 
 import (
 	"net/netip"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -41,13 +40,13 @@ var _ = Describe("LoadBalancer", func() {
 	It("Should ensure LoadBalancer info", func() {
 
 		By("getting the LoadBalancer interface")
-		lb, ok := provider.LoadBalancer()
+		loadbalancer, ok := provider.LoadBalancer()
 		Expect(ok).To(BeTrue())
 
 		By("creating a LoadBalancer type service")
 		service := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "mylbservice",
+				Name:      "my-service",
 				Namespace: ns.Name,
 			},
 			Spec: corev1.ServiceSpec{
@@ -67,11 +66,11 @@ var _ = Describe("LoadBalancer", func() {
 
 		By("returning error if nodes are less than 1")
 		Eventually(func(g Gomega) {
-			_, err := lb.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{})
-			g.Expect(err).Should(MatchError("no nodes"))
+			_, err := loadbalancer.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{})
+			g.Expect(err).Should(MatchError("there are no available nodes for LoadBalancer service " + service.Name))
 		}).Should(Succeed())
 
-		By("creating a node object without referencing the machine")
+		By("creating a Node object")
 		node1 := &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "node1",
@@ -79,29 +78,11 @@ var _ = Describe("LoadBalancer", func() {
 		}
 		Expect(k8sClient.Create(ctx, node1)).To(Succeed())
 
-		By("returning error if node is not referencing to machine")
+		By("failing if no Machine is present for a given Node object")
 		Eventually(func(g Gomega) {
-			_, err := lb.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node1})
+			_, err := loadbalancer.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node1})
 			g.Expect(err).Should(MatchError("instance not found"))
 		}).Should(Succeed())
-
-		apiVersion := lbAPIVersion
-		lbAPIVersion = "wrong.api.version"
-		By("returning error if loadbalancer api version is not correct")
-		Eventually(func(g Gomega) {
-			_, err := lb.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node1})
-			g.Expect(err).Should(HaveField("ErrStatus.Message", ContainSubstring("Incorrect version specified in apply patch")))
-		}).Should(Succeed())
-		lbAPIVersion = apiVersion
-
-		By("creating a network")
-		network := &networkingv1alpha1.Network{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
-				Name:      networkName,
-			},
-		}
-		Expect(k8sClient.Create(ctx, network)).To(Succeed())
 
 		By("creating a machine")
 		machine := &computev1alpha1.Machine{
@@ -119,7 +100,7 @@ var _ = Describe("LoadBalancer", func() {
 							Ephemeral: &computev1alpha1.EphemeralNetworkInterfaceSource{
 								NetworkInterfaceTemplate: &networkingv1alpha1.NetworkInterfaceTemplateSpec{
 									Spec: networkingv1alpha1.NetworkInterfaceSpec{
-										NetworkRef: corev1.LocalObjectReference{Name: network.Name},
+										NetworkRef: corev1.LocalObjectReference{Name: networkName},
 										IPs:        []networkingv1alpha1.IPSource{{Value: commonv1alpha1.MustParseNewIP("10.0.0.1")}},
 										VirtualIP: &networkingv1alpha1.VirtualIPSource{
 											Ephemeral: &networkingv1alpha1.EphemeralVirtualIPSource{
@@ -142,7 +123,7 @@ var _ = Describe("LoadBalancer", func() {
 		}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
 
-		By("creating a node object with a provider ID referencing the machine")
+		By("creating a Node object with a provider ID referencing the machine")
 		node := &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: machine.Name,
@@ -150,28 +131,34 @@ var _ = Describe("LoadBalancer", func() {
 		}
 		Expect(k8sClient.Create(ctx, node)).To(Succeed())
 
-		lbName := clusterName + "-" + service.Name + "-" + string(service.UID)
-		By("returning error if gets timeout while waiting for loadbalancer active status")
+		By("failing when network object is not found")
 		Eventually(func(g Gomega) {
-			_, err := lb.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})
-			g.Expect(err).Should(MatchError("timeout waiting for the onmetal loadbalancer " + lbName))
+			_, err := loadbalancer.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})
+			g.Expect(err).Should(MatchError("failed to get network Object for " + networkName))
 		}).Should(Succeed())
 
-		go func() {
-			time.Sleep(1 * time.Second)
-			By("patching public IP into loadbalancer status")
-			lb := &networkingv1alpha1.LoadBalancer{}
-			Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: service.Namespace, Name: string(lbName)}, lb)).To(Succeed())
-			lbBase := lb.DeepCopy()
-			lb.Status = networkingv1alpha1.LoadBalancerStatus{
-				IPs: []commonv1alpha1.IP{{Addr: netip.AddrFrom4([4]byte{10, 0, 0, 1})}},
-			}
-			Expect(k8sClient.Status().Patch(ctx, lb, client.MergeFrom(lbBase))).To(Succeed())
-		}()
+		By("creating a network")
+		network := &networkingv1alpha1.Network{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      networkName,
+			},
+		}
+		Expect(k8sClient.Create(ctx, network)).To(Succeed())
+
+		lbName := getLoadBalancerName(clusterName, service)
+		By("patching public IP into loadbalancer status")
+		lb := &networkingv1alpha1.LoadBalancer{}
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: service.Namespace, Name: lbName}, lb)).To(Succeed())
+		lbBase := lb.DeepCopy()
+		lb.Status = networkingv1alpha1.LoadBalancerStatus{
+			IPs: []commonv1alpha1.IP{{Addr: netip.AddrFrom4([4]byte{10, 0, 0, 1})}},
+		}
+		Expect(k8sClient.Status().Patch(ctx, lb, client.MergeFrom(lbBase))).To(Succeed())
 
 		By("creating LoadBalancer for service")
 		Eventually(func(g Gomega) {
-			lbStatus, err := lb.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})
+			lbStatus, err := loadbalancer.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(lbStatus).To(Equal(&corev1.LoadBalancerStatus{
 				Ingress: []corev1.LoadBalancerIngress{{IP: "10.0.0.1"}},

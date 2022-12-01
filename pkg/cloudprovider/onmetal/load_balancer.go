@@ -16,8 +16,8 @@ package onmetal
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/onmetal/onmetal-api/api/common/v1alpha1"
-	nwv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
+	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
 )
 
 type onmetalLoadBalancer struct {
@@ -46,8 +46,9 @@ const (
 	waitLoadbalancerActiveSteps = 19
 )
 
-var lbAPIVersion = "networking.api.onmetal.de/v1alpha1"
-var lbFieldOwner = "networking.api.onmetal.de/v1alpha1/loadbalancer"
+var (
+	loadbalancerFieldOwner = client.FieldOwner("cloud-provider.onmetal.de/loadbalancer")
+)
 
 func newOnmetalLoadBalancer(targetClient client.Client, onmetalClient client.Client, namespace string, networkName string) cloudprovider.LoadBalancer {
 	return &onmetalLoadBalancer{
@@ -67,31 +68,30 @@ func (o *onmetalLoadBalancer) GetLoadBalancerName(ctx context.Context, clusterNa
 }
 
 func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-
-	klog.V(4).InfoS("EnsureLoadBalancer", "cluster", clusterName, "service", klog.KObj(service))
+	klog.V(2).InfoS("EnsureLoadBalancer", "cluster", clusterName, "service", klog.KObj(service))
 
 	klog.V(4).Info("EnsureLoadBalancer - check if nodes are present")
 	if len(nodes) == 0 {
-		return nil, errors.New("no nodes")
+		return nil, fmt.Errorf("there are no available nodes for LoadBalancer service %s", service.Name)
 	}
 
 	klog.V(4).Info("EnsureLoadBalancer - get loadbalancer name")
-	lbName := fmt.Sprintf("%s-%s-%s", clusterName, service.Name, service.UID)
+	lbName := getLoadBalancerName(clusterName, service)
 
 	klog.V(4).Info("EnsureLoadBalancer - get service ports and protocols")
-	lbPorts := []nwv1alpha1.LoadBalancerPort{}
+	lbPorts := []networkingv1alpha1.LoadBalancerPort{}
 	for _, svcPort := range service.Spec.Ports {
-		lbPorts = append(lbPorts, nwv1alpha1.LoadBalancerPort{
+		lbPorts = append(lbPorts, networkingv1alpha1.LoadBalancerPort{
 			Protocol: &svcPort.Protocol,
 			Port:     svcPort.Port,
 		})
 	}
 
 	klog.V(4).Info("EnsureLoadBalancer - Create loadBalancer for service")
-	loadBalancer := &nwv1alpha1.LoadBalancer{
+	loadBalancer := &networkingv1alpha1.LoadBalancer{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       string(v1.ServiceTypeLoadBalancer),
-			APIVersion: lbAPIVersion,
+			Kind:       "LoadBalancer",
+			APIVersion: networkingv1alpha1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      lbName,
@@ -103,8 +103,8 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 				"service-uid":       string(service.UID),
 			},
 		},
-		Spec: nwv1alpha1.LoadBalancerSpec{
-			Type:       nwv1alpha1.LoadBalancerTypePublic,
+		Spec: networkingv1alpha1.LoadBalancerSpec{
+			Type:       networkingv1alpha1.LoadBalancerTypePublic,
 			IPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
 			NetworkRef: v1.LocalObjectReference{
 				Name: o.networkName,
@@ -113,7 +113,7 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 		},
 	}
 
-	if err := o.onmetalClient.Patch(ctx, loadBalancer, client.Apply, client.FieldOwner(lbFieldOwner), client.ForceOwnership); err != nil {
+	if err := o.onmetalClient.Patch(ctx, loadBalancer, client.Apply, client.FieldOwner(loadbalancerFieldOwner), client.ForceOwnership); err != nil {
 		return nil, err
 	}
 	klog.V(4).Infof("EnsureLoadBalancer - ensured loadbalancer %s successfully", loadBalancer.Name)
@@ -138,7 +138,12 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 	return &v1.LoadBalancerStatus{Ingress: lbIngress}, nil
 }
 
-func WaitLoadbalancerActive(ctx context.Context, clusterName string, service *v1.Service, onmetalClient client.Client, loadBalancer *nwv1alpha1.LoadBalancer) error {
+func getLoadBalancerName(clusterName string, service *v1.Service) string {
+	nameSuffix := strings.Split(string(service.UID), "-")[0]
+	return fmt.Sprintf("%s-%s-%s", clusterName, service.Name, nameSuffix)
+}
+
+func WaitLoadbalancerActive(ctx context.Context, clusterName string, service *v1.Service, onmetalClient client.Client, loadBalancer *networkingv1alpha1.LoadBalancer) error {
 	klog.V(4).InfoS("Waiting for onmetal load balancer is ready", "lbName", loadBalancer.Name)
 	backoff := wait.Backoff{
 		Duration: waitLoadbalancerInitDelay,
@@ -164,9 +169,8 @@ func WaitLoadbalancerActive(ctx context.Context, clusterName string, service *v1
 	return err
 }
 
-func (o *onmetalLoadBalancer) ensureLoadBalancerRouting(ctx context.Context, loadBalancer *nwv1alpha1.LoadBalancer, nodes []*v1.Node) error {
-
-	klog.V(4).Info("ensureLoadBalancerRouting - create LoadBalancerRouting for ", loadBalancer.Name)
+func (o *onmetalLoadBalancer) ensureLoadBalancerRouting(ctx context.Context, loadBalancer *networkingv1alpha1.LoadBalancer, nodes []*v1.Node) error {
+	klog.V(2).Info("ensureLoadBalancerRouting - create LoadBalancerRouting for ", loadBalancer.Name)
 
 	var lbrNwInterfaces = []v1alpha1.LocalUIDReference{}
 	for _, node := range nodes {
@@ -187,10 +191,16 @@ func (o *onmetalLoadBalancer) ensureLoadBalancerRouting(ctx context.Context, loa
 		}
 	}
 
-	loadBalancerRouting := &nwv1alpha1.LoadBalancerRouting{
+	network := &networkingv1alpha1.Network{}
+	err := o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: string(o.networkName)}, network)
+	if err != nil {
+		return fmt.Errorf("failed to get network Object for %s", o.networkName)
+	}
+
+	loadBalancerRouting := &networkingv1alpha1.LoadBalancerRouting{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "LoadBalancerRouting",
-			APIVersion: lbAPIVersion,
+			APIVersion: networkingv1alpha1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      loadBalancer.Name,
@@ -198,6 +208,7 @@ func (o *onmetalLoadBalancer) ensureLoadBalancerRouting(ctx context.Context, loa
 		},
 		NetworkRef: v1alpha1.LocalUIDReference{
 			Name: o.networkName,
+			UID:  network.UID,
 		},
 		Destinations: lbrNwInterfaces,
 	}
@@ -206,7 +217,7 @@ func (o *onmetalLoadBalancer) ensureLoadBalancerRouting(ctx context.Context, loa
 		return fmt.Errorf("failed to set ownerreference for LoadBalancerRouting %s: %w", client.ObjectKeyFromObject(loadBalancerRouting), err)
 	}
 
-	return o.onmetalClient.Patch(ctx, loadBalancerRouting, client.Apply, client.FieldOwner(lbFieldOwner), client.ForceOwnership)
+	return o.onmetalClient.Patch(ctx, loadBalancerRouting, client.Apply, client.FieldOwner(loadbalancerFieldOwner), client.ForceOwnership)
 }
 
 func (o *onmetalLoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {

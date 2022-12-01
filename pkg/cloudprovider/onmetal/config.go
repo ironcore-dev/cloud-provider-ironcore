@@ -33,7 +33,7 @@ type onmetalCloudProviderConfig struct {
 
 type CloudConfig struct {
 	Namespace   string `json:"namespace"`
-	NetworkName string `json:"network-name"`
+	NetworkName string `json:"networkname"`
 	Kubeconfig  string `json:"kubeconfig"`
 }
 
@@ -54,7 +54,7 @@ func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
 	}
 
 	if cloudConfig.NetworkName == "" {
-		return nil, fmt.Errorf("network-name missing in cloud config")
+		return nil, fmt.Errorf("networkname missing in cloud config")
 	}
 
 	if cloudConfig.Kubeconfig == "" {

@@ -26,7 +26,7 @@ var _ = Describe("Instances", func() {
 		kubeconfigWrongSample = `---`
 		kubeconfigSample      = `---
 namespace: abcd
-network-name: my-network
+networkname: my-network
 kubeconfig: | 
   apiVersion: v1
   clusters:
