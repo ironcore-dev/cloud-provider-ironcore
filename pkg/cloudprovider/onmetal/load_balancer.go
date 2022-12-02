@@ -20,7 +20,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onmetal/onmetal-api/api/common/v1alpha1"
+	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -28,9 +31,6 @@ import (
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/onmetal/onmetal-api/api/common/v1alpha1"
-	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
 )
 
 type onmetalLoadBalancer struct {
@@ -60,11 +60,28 @@ func newOnmetalLoadBalancer(targetClient client.Client, onmetalClient client.Cli
 }
 
 func (o *onmetalLoadBalancer) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
-	return nil, false, cloudprovider.NotImplemented
+	lbName := o.GetLoadBalancerName(ctx, clusterName, service)
+	klog.V(4).Infof("Getting loadbalancer %s", lbName)
+	loadBalancer := &networkingv1alpha1.LoadBalancer{}
+	err = o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: lbName}, loadBalancer)
+
+	if apierrors.IsNotFound(err) {
+		return nil, false, cloudprovider.InstanceNotFound
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to get loadbalancer %s for service %s: %w", lbName, service.Name, err)
+	}
+
+	lbAllocatedIps := loadBalancer.Status.IPs
+	status = &v1.LoadBalancerStatus{}
+	for _, ip := range lbAllocatedIps {
+		status.Ingress = append(status.Ingress, v1.LoadBalancerIngress{IP: ip.GomegaString()})
+	}
+	return status, true, nil
 }
 
 func (o *onmetalLoadBalancer) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
-	return ""
+	return getLoadBalancerName(clusterName, service)
 }
 
 func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
@@ -225,5 +242,21 @@ func (o *onmetalLoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterNam
 }
 
 func (o *onmetalLoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
-	return cloudprovider.NotImplemented
+	lbName := o.GetLoadBalancerName(ctx, clusterName, service)
+	klog.V(4).Infof("Deleting loadbalancer instance with name: %s", lbName)
+	loadBalancer := &networkingv1alpha1.LoadBalancer{}
+	err := o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: lbName}, loadBalancer)
+
+	if apierrors.IsNotFound(err) {
+		return cloudprovider.InstanceNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("failed to get loadbalancer %s: %w", lbName, err)
+	}
+
+	if err = o.onmetalClient.Delete(ctx, loadBalancer); err != nil {
+		return fmt.Errorf("failed to delete loadbalancer %s: %w", lbName, err)
+	}
+
+	return nil
 }
