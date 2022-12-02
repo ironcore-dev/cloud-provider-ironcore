@@ -69,7 +69,7 @@ func (o *onmetalLoadBalancer) GetLoadBalancer(ctx context.Context, clusterName s
 		return nil, false, cloudprovider.InstanceNotFound
 	}
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("failed to get loadbalancer %s for service %s: %w", lbName, service.Name, err)
 	}
 
 	lbAllocatedIps := loadBalancer.Status.IPs
@@ -243,15 +243,15 @@ func (o *onmetalLoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterNam
 
 func (o *onmetalLoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
 	lbName := o.GetLoadBalancerName(ctx, clusterName, service)
-	klog.V(4).Infof("Deleting loadbalancer instance with name: ", lbName)
+	klog.V(4).Infof("Deleting loadbalancer instance with name: %s", lbName)
 	loadBalancer := &networkingv1alpha1.LoadBalancer{}
-	err := o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: string(lbName)}, loadBalancer)
+	err := o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: lbName}, loadBalancer)
 
 	if apierrors.IsNotFound(err) {
 		return cloudprovider.InstanceNotFound
 	}
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get loadbalancer %s: %w", lbName, err)
 	}
 
 	if err = o.onmetalClient.Delete(ctx, loadBalancer); err != nil {
