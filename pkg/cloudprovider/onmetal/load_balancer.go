@@ -60,10 +60,10 @@ func newOnmetalLoadBalancer(targetClient client.Client, onmetalClient client.Cli
 }
 
 func (o *onmetalLoadBalancer) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
-	name := o.GetLoadBalancerName(ctx, clusterName, service)
-	klog.V(4).Infof("Getting loadbalancer status with name: ", name)
+	lbName := o.GetLoadBalancerName(ctx, clusterName, service)
+	klog.V(4).Infof("Getting loadbalancer %s", lbName)
 	loadBalancer := &networkingv1alpha1.LoadBalancer{}
-	err = o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: string(name)}, loadBalancer)
+	err = o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: lbName}, loadBalancer)
 
 	if apierrors.IsNotFound(err) {
 		return nil, false, cloudprovider.InstanceNotFound
@@ -81,10 +81,7 @@ func (o *onmetalLoadBalancer) GetLoadBalancer(ctx context.Context, clusterName s
 }
 
 func (o *onmetalLoadBalancer) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
-	klog.V(4).Infof("Getting loadbalancer name with cluster name: %s, service name: %s serviceUID: %s\n", clusterName, service.Name, service.UID)
-	nameSuffix := strings.Split(string(service.UID), "-")[0]
-	lbName := fmt.Sprintf("%s-%s-%s", clusterName, service.Name, nameSuffix)
-	return trimLoadBalancerName(lbName)
+	return getLoadBalancerName(clusterName, service)
 }
 
 func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
@@ -96,7 +93,7 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 	}
 
 	klog.V(4).Info("EnsureLoadBalancer - get loadbalancer name")
-	lbName := o.GetLoadBalancerName(ctx, clusterName, service)
+	lbName := getLoadBalancerName(clusterName, service)
 
 	klog.V(4).Info("EnsureLoadBalancer - get service ports and protocols")
 	lbPorts := []networkingv1alpha1.LoadBalancerPort{}
@@ -156,6 +153,11 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 	}
 
 	return &v1.LoadBalancerStatus{Ingress: lbIngress}, nil
+}
+
+func getLoadBalancerName(clusterName string, service *v1.Service) string {
+	nameSuffix := strings.Split(string(service.UID), "-")[0]
+	return fmt.Sprintf("%s-%s-%s", clusterName, service.Name, nameSuffix)
 }
 
 func WaitLoadbalancerActive(ctx context.Context, clusterName string, service *v1.Service, onmetalClient client.Client, loadBalancer *networkingv1alpha1.LoadBalancer) error {
@@ -252,19 +254,9 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clu
 		return err
 	}
 
-	err = o.onmetalClient.Delete(ctx, loadBalancer)
-	if err != nil {
-		return err
+	if err = o.onmetalClient.Delete(ctx, loadBalancer); err != nil {
+		return fmt.Errorf("failed to delete loadbalancer %s: %w", lbName, err)
 	}
 
 	return nil
-}
-
-// trimLoadBalancerName makes sure the string length doesn't exceed 63, which is usually the maximum length for LoadBalancer name.
-func trimLoadBalancerName(original string) string {
-	ret := original
-	if len(original) > 62 {
-		ret = original[:62]
-	}
-	return ret
 }

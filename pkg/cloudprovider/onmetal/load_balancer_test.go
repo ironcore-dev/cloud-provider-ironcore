@@ -149,7 +149,7 @@ var _ = Describe("LoadBalancer", func() {
 		}
 		Expect(k8sClient.Create(ctx, network)).To(Succeed())
 
-		lbName := loadbalancer.GetLoadBalancerName(ctx, clusterName, service)
+		lbName := getLoadBalancerName(clusterName, service)
 		By("patching public IP into loadbalancer status")
 		lb := &networkingv1alpha1.LoadBalancer{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: service.Namespace, Name: lbName}, lb)).To(Succeed())
@@ -183,7 +183,7 @@ var _ = Describe("LoadBalancer", func() {
 		const uid types.UID = "2020de0-e47ef-wef4fr-6ytt54-ee7763d"
 
 		By("creating a LoadBalancer")
-		lbName := trimLoadBalancerName("envtest-" + "myservice-" + strings.Split(string(uid), "-")[0])
+		lbName := "envtest-" + "myservice-" + strings.Split(string(uid), "-")[0]
 		loadBalancer := &networkingv1alpha1.LoadBalancer{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
@@ -258,7 +258,7 @@ var _ = Describe("LoadBalancer", func() {
 		const uid types.UID = "2020de0-e47ef-wef4fr-6ytt54-ee7763d"
 
 		By("creating a LoadBalancer")
-		lbName := trimLoadBalancerName("envtest-" + "myservice-" + strings.Split(string(uid), "-")[0])
+		lbName := "envtest-" + "myservice-" + strings.Split(string(uid), "-")[0]
 		loadBalancer := &networkingv1alpha1.LoadBalancer{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
