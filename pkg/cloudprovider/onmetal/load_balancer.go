@@ -238,7 +238,7 @@ func (o *onmetalLoadBalancer) ensureLoadBalancerRouting(ctx context.Context, loa
 }
 
 func (o *onmetalLoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
-	klog.Info("UpdateLoadBalancer - Check if nodes are present")
+	klog.V(4).Info("UpdateLoadBalancer - Check if nodes are present")
 	items := []commonv1alpha1.LocalUIDReference{}
 	loadBalancer := &networkingv1alpha1.LoadBalancer{}
 	lbRouting := &networkingv1alpha1.LoadBalancerRouting{}
@@ -249,31 +249,36 @@ func (o *onmetalLoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterNam
 
 	lbName := o.GetLoadBalancerName(ctx, clusterName, service)
 
-	err := o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: lbName}, loadBalancer)
-	if err != nil {
+	if err := o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: lbName}, loadBalancer); err != nil {
 		return fmt.Errorf("there is no loadbalancer at present")
 	}
 
-	err = o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: lbName}, lbRouting)
-
-	if err != nil {
-		return fmt.Errorf("there is no loadbalancer routing present")
+	if err := o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: lbName}, lbRouting); err != nil {
+		return cloudprovider.InstanceNotFound
 	}
 
-	klog.Info("UpdateLoadBalancer - Updating lbRouting Destinations with networkInterfaces")
+	klog.V(4).Info("UpdateLoadBalancer - Updating lbRouting Destinations with networkInterfaces")
 	for _, node := range nodes {
-		machine, _ := GetMachineForNode(ctx, o.onmetalClient, o.onmetalNamespace, node)
+		machine, err := GetMachineForNode(ctx, o.onmetalClient, o.onmetalNamespace, node)
+		if err != nil {
+			return err
+		}
 		for _, networkInterface := range machine.Spec.NetworkInterfaces {
+			nic := &networkingv1alpha1.NetworkInterface{}
+			if err := o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: networkInterface.Name}, nic); err != nil {
+				return cloudprovider.InstanceNotFound
+			}
 			item := commonv1alpha1.LocalUIDReference{
-				Name: networkInterface.Name,
-				UID:  networkInterface.Ephemeral.NetworkInterfaceTemplate.UID,
+				Name: nic.Name,
+				UID:  nic.UID,
 			}
 			items = append(items, item)
 		}
 	}
+	lbRoutingBase := lbRouting.DeepCopy()
 	lbRouting.Destinations = items
 
-	if err = o.onmetalClient.Update(ctx, lbRouting); err != nil {
+	if err := o.onmetalClient.Patch(ctx, lbRouting, client.MergeFrom(lbRoutingBase)); err != nil {
 		return err
 	}
 
