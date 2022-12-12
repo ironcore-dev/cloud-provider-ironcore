@@ -132,6 +132,29 @@ var _ = Describe("LoadBalancer", func() {
 		}
 		Expect(k8sClient.Create(ctx, netInterface1)).To(Succeed())
 
+		By("creating a network interface")
+		netInterface2 := &networkingv1alpha1.NetworkInterface{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "my-netinterface2",
+				Namespace: ns.Name,
+			},
+			Spec: networkingv1alpha1.NetworkInterfaceSpec{
+				NetworkRef: corev1.LocalObjectReference{Name: "my-network-2"},
+				IPs:        []networkingv1alpha1.IPSource{{Value: commonv1alpha1.MustParseNewIP("10.0.0.7")}},
+				VirtualIP: &networkingv1alpha1.VirtualIPSource{
+					Ephemeral: &networkingv1alpha1.EphemeralVirtualIPSource{
+						VirtualIPTemplate: &networkingv1alpha1.VirtualIPTemplateSpec{
+							Spec: networkingv1alpha1.VirtualIPSpec{
+								Type:     networkingv1alpha1.VirtualIPTypePublic,
+								IPFamily: corev1.IPv4Protocol,
+							},
+						},
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, netInterface2)).To(Succeed())
+
 		By("creating a machine")
 		machine2 := &computev1alpha1.Machine{
 			ObjectMeta: metav1.ObjectMeta{
@@ -148,6 +171,14 @@ var _ = Describe("LoadBalancer", func() {
 						NetworkInterfaceSource: computev1alpha1.NetworkInterfaceSource{
 							NetworkInterfaceRef: &corev1.LocalObjectReference{
 								Name: netInterface.Name,
+							},
+						},
+					},
+					{
+						Name: netInterface2.Name,
+						NetworkInterfaceSource: computev1alpha1.NetworkInterfaceSource{
+							NetworkInterfaceRef: &corev1.LocalObjectReference{
+								Name: netInterface2.Name,
 							},
 						},
 					},
@@ -223,45 +254,6 @@ var _ = Describe("LoadBalancer", func() {
 		}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
 
-		By("creating a machine")
-		machine1 := &computev1alpha1.Machine{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "machine1-",
-			},
-			Spec: computev1alpha1.MachineSpec{
-				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
-				Image:           "my-image:latest",
-				NetworkInterfaces: []computev1alpha1.NetworkInterface{
-					{
-						Name: "my-nic1",
-						NetworkInterfaceSource: computev1alpha1.NetworkInterfaceSource{
-							Ephemeral: &computev1alpha1.EphemeralNetworkInterfaceSource{
-								NetworkInterfaceTemplate: &networkingv1alpha1.NetworkInterfaceTemplateSpec{
-									Spec: networkingv1alpha1.NetworkInterfaceSpec{
-										NetworkRef: corev1.LocalObjectReference{Name: networkName},
-										IPs:        []networkingv1alpha1.IPSource{{Value: commonv1alpha1.MustParseNewIP("10.0.0.1")}},
-										VirtualIP: &networkingv1alpha1.VirtualIPSource{
-											Ephemeral: &networkingv1alpha1.EphemeralVirtualIPSource{
-												VirtualIPTemplate: &networkingv1alpha1.VirtualIPTemplateSpec{
-													Spec: networkingv1alpha1.VirtualIPSpec{
-														Type:     networkingv1alpha1.VirtualIPTypePublic,
-														IPFamily: corev1.IPv4Protocol,
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				Volumes: []computev1alpha1.Volume{},
-			},
-		}
-		Expect(k8sClient.Create(ctx, machine1)).To(Succeed())
-
 		By("creating a Node object with a provider ID referencing the machine")
 		node := &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
@@ -330,19 +322,35 @@ var _ = Describe("LoadBalancer", func() {
 		items := []commonv1alpha1.LocalUIDReference{}
 		nic1 := &networkingv1alpha1.NetworkInterface{}
 		nic2 := &networkingv1alpha1.NetworkInterface{}
+		nic3 := &networkingv1alpha1.NetworkInterface{}
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns.Name, Name: machine2.Spec.NetworkInterfaces[0].Name}, nic1)).To(Succeed())
-		item1 := commonv1alpha1.LocalUIDReference{
-			Name: nic1.Name,
-			UID:  nic1.UID,
+		if nic1.Spec.NetworkRef.Name == networkName {
+			item := commonv1alpha1.LocalUIDReference{
+				Name: nic1.Name,
+				UID:  nic1.UID,
+			}
+			items = append(items, item)
 		}
 
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns.Name, Name: machine3.Spec.NetworkInterfaces[0].Name}, nic2)).To(Succeed())
-
-		item2 := commonv1alpha1.LocalUIDReference{
-			Name: nic2.Name,
-			UID:  nic2.UID,
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns.Name, Name: machine2.Spec.NetworkInterfaces[1].Name}, nic2)).To(Succeed())
+		if nic2.Spec.NetworkRef.Name == networkName {
+			item := commonv1alpha1.LocalUIDReference{
+				Name: nic2.Name,
+				UID:  nic2.UID,
+			}
+			items = append(items, item)
 		}
-		items = append(items, item1, item2)
+
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns.Name, Name: machine3.Spec.NetworkInterfaces[0].Name}, nic3)).To(Succeed())
+		if nic3.Spec.NetworkRef.Name == networkName {
+			item := commonv1alpha1.LocalUIDReference{
+				Name: nic3.Name,
+				UID:  nic3.UID,
+			}
+			items = append(items, item)
+		}
+
+		//items = append(items, item1, item2, item3)
 
 		By("ensuring that the destination addressed are updated")
 		Eventually(func(g Gomega) {

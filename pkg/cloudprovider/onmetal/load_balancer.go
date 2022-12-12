@@ -265,14 +265,20 @@ func (o *onmetalLoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterNam
 		}
 		for _, networkInterface := range machine.Spec.NetworkInterfaces {
 			nic := &networkingv1alpha1.NetworkInterface{}
+			fmt.Println("network interface ref Name:", networkInterface.NetworkInterfaceSource.NetworkInterfaceRef.Name)
+			fmt.Println("loadbalancer network ref name:", loadBalancer.Spec.NetworkRef.Name)
 			if err := o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: networkInterface.Name}, nic); err != nil {
-				return cloudprovider.InstanceNotFound
+				if !apierrors.IsNotFound(err) {
+					return fmt.Errorf("error getting network interface %v: %w", nic, err)
+				}
 			}
-			item := commonv1alpha1.LocalUIDReference{
-				Name: nic.Name,
-				UID:  nic.UID,
+			if nic.Spec.NetworkRef.Name == loadBalancer.Spec.NetworkRef.Name {
+				item := commonv1alpha1.LocalUIDReference{
+					Name: nic.Name,
+					UID:  nic.UID,
+				}
+				items = append(items, item)
 			}
-			items = append(items, item)
 		}
 	}
 	lbRoutingBase := lbRouting.DeepCopy()
