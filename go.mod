@@ -4,8 +4,8 @@ go 1.19
 
 require (
 	github.com/google/addlicense v1.1.0
-	github.com/onmetal/controller-utils v0.6.4
-	github.com/onmetal/onmetal-api v0.0.13-0.20221117152616-d0a906f467b4
+	github.com/onmetal/controller-utils v0.6.5
+	github.com/onmetal/onmetal-api v0.0.13-0.20221209171738-4a6e20c76693
 	github.com/onsi/ginkgo/v2 v2.5.1
 	github.com/onsi/gomega v1.24.1
 	github.com/pkg/errors v0.9.1
@@ -16,6 +16,7 @@ require (
 	k8s.io/component-base v0.24.8
 	k8s.io/controller-manager v0.24.8
 	k8s.io/klog/v2 v2.80.1
+	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed
 	sigs.k8s.io/controller-runtime v0.12.3
 	sigs.k8s.io/yaml v1.3.0
 )
@@ -109,7 +110,6 @@ require (
 	k8s.io/component-helpers v0.24.8 // indirect
 	k8s.io/kube-aggregator v0.24.8 // indirect
 	k8s.io/kube-openapi v0.0.0-20220401212409-b28bf2818661 // indirect
-	k8s.io/utils v0.0.0-20220728103510-ee6ede2d64ed // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.33 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
