@@ -19,13 +19,13 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 
 	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
@@ -74,24 +74,21 @@ func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
 
 	onmetalCluster, err := cluster.New(cfg.RestConfig, func(o *cluster.Options) {
 		o.Scheme = scheme.Scheme
+		o.Namespace = cfg.Namespace
 	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to create onmetal cluster: %w", err)
 	}
 
 	onmetalClient := onmetalCluster.GetClient()
-
 	routes := newOnmetalRoutes(onmetalClient)
-	zones := newOnmetalZones(onmetalClient)
 
 	klog.V(2).Infof("Successfully setup cloud provider: %s", CloudProviderName)
-
 	return &onmetalCloudProvider{
 		onmetalCluster:   onmetalCluster,
 		onmetalNamespace: cfg.Namespace,
 		networkName:      cfg.NetworkName,
 		routes:           routes,
-		zones:            zones,
 	}, nil
 }
 
@@ -111,7 +108,8 @@ func (o *onmetalCloudProvider) Initialize(clientBuilder cloudprovider.Controller
 	if err != nil {
 		log.Fatalf("Failed to create new cluster: %v", err)
 	}
-	o.instances = newOnmetalInstances(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace)
+
+	//o.instances = newOnmetalInstances(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace)
 	o.instancesV2 = newOnmetalInstancesV2(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace)
 	o.loadBalancer = newOnmetalLoadBalancer(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace, o.networkName)
 

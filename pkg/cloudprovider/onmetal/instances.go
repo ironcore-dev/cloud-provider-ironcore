@@ -26,7 +26,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/onmetal/onmetal-api/api/compute/v1alpha1"
+	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
 )
 
 type onmetalInstances struct {
@@ -146,7 +146,7 @@ func (o *onmetalInstances) InstanceShutdownByProviderID(ctx context.Context, pro
 		return false, err
 	}
 
-	return machine.Status.State == v1alpha1.MachineStateShutdown, nil
+	return machine.Status.State == computev1alpha1.MachineStateShutdown, nil
 }
 
 func getMachineUIDFromProviderID(providerID string) string {

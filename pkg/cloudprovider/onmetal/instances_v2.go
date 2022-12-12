@@ -17,7 +17,6 @@ package onmetal
 import (
 	"context"
 	"fmt"
-
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	cloudprovider "k8s.io/cloud-provider"
@@ -100,12 +99,22 @@ func (o *onmetalInstancesV2) InstanceMetadata(ctx context.Context, node *corev1.
 		}
 	}
 
-	// TODO: handle zone and region
+	providerID := node.Spec.ProviderID
+	if providerID == "" {
+		providerID = fmt.Sprintf("%s://%s/%s", CloudProviderName, o.onmetalNamespace, machine.Name)
+	}
+
+	zone := ""
+	if machine.Spec.MachinePoolRef != nil {
+		zone = machine.Spec.MachinePoolRef.Name
+	}
+
+	// TODO: handle region
 	return &cloudprovider.InstanceMetadata{
-		ProviderID:    node.Spec.ProviderID,
+		ProviderID:    providerID,
 		InstanceType:  machine.Spec.MachineClassRef.Name,
 		NodeAddresses: addresses,
-		Zone:          "",
+		Zone:          zone,
 		Region:        "",
 	}, nil
 }
