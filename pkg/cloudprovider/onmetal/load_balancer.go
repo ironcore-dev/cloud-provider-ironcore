@@ -265,8 +265,6 @@ func (o *onmetalLoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterNam
 		}
 		for _, networkInterface := range machine.Spec.NetworkInterfaces {
 			nic := &networkingv1alpha1.NetworkInterface{}
-			fmt.Println("network interface ref Name:", networkInterface.NetworkInterfaceSource.NetworkInterfaceRef.Name)
-			fmt.Println("loadbalancer network ref name:", loadBalancer.Spec.NetworkRef.Name)
 			if err := o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: networkInterface.Name}, nic); err != nil {
 				if !apierrors.IsNotFound(err) {
 					return fmt.Errorf("error getting network interface %v: %w", nic, err)
