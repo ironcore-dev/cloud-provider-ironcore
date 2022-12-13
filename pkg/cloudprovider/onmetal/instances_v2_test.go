@@ -15,6 +15,7 @@
 package onmetal
 
 import (
+	"fmt"
 	"net/netip"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -52,6 +53,7 @@ var _ = Describe("InstancesV2", func() {
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
+				MachinePoolRef:  &corev1.LocalObjectReference{Name: "zone1"},
 				Image:           "my-image:latest",
 				NetworkInterfaces: []computev1alpha1.NetworkInterface{
 					{
@@ -125,7 +127,7 @@ var _ = Describe("InstancesV2", func() {
 			instanceMetadata, err := instances.InstanceMetadata(ctx, node)
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(instanceMetadata).To(Equal(&cloudprovider.InstanceMetadata{
-				ProviderID:   node.Spec.ProviderID,
+				ProviderID:   fmt.Sprintf("%s://%s/%s", CloudProviderName, machine.Namespace, machine.Name),
 				InstanceType: machine.Spec.MachineClassRef.Name,
 				NodeAddresses: []corev1.NodeAddress{
 					{
@@ -137,7 +139,7 @@ var _ = Describe("InstancesV2", func() {
 						Address: "10.0.0.1",
 					},
 				},
-				Zone:   "",
+				Zone:   "zone1",
 				Region: "",
 			}))
 		}).Should(Succeed())

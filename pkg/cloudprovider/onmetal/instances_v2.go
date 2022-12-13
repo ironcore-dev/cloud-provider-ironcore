@@ -17,13 +17,14 @@ package onmetal
 import (
 	"context"
 	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/onmetal/onmetal-api/api/compute/v1alpha1"
+	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
 )
 
 type onmetalInstancesV2 struct {
@@ -68,7 +69,7 @@ func (o *onmetalInstancesV2) InstanceShutdown(ctx context.Context, node *corev1.
 		return false, fmt.Errorf("failed to get machine for node %s: %w", node.Name, err)
 	}
 
-	return machine.Status.State == v1alpha1.MachineStateShutdown, nil
+	return machine.Status.State == computev1alpha1.MachineStateShutdown, nil
 }
 
 func (o *onmetalInstancesV2) InstanceMetadata(ctx context.Context, node *corev1.Node) (*cloudprovider.InstanceMetadata, error) {

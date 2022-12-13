@@ -16,7 +16,6 @@ package onmetal
 
 import (
 	"context"
-	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -26,24 +25,6 @@ import (
 
 	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
 )
-
-func GetMachineForProviderID(ctx context.Context, c client.Client, namespace string, providerID string) (*computev1alpha1.Machine, error) {
-	machineUID := getMachineUIDFromProviderID(providerID)
-	machineList := &computev1alpha1.MachineList{}
-	if err := c.List(ctx, machineList, client.InNamespace(namespace), client.MatchingFields{
-		machineMetadataUIDField: machineUID,
-	}); err != nil {
-		return nil, fmt.Errorf("failed to get machine with UID %s: %w", machineUID, err)
-	}
-	switch len(machineList.Items) {
-	case 0:
-		return nil, apierrors.NewNotFound(computev1alpha1.Resource("machines"), fmt.Sprintf("UID: %s", machineUID))
-	case 1:
-		return &machineList.Items[0], nil
-	default:
-		return nil, fmt.Errorf("multiple machines found for uid %s", machineUID)
-	}
-}
 
 func GetMachineForNode(ctx context.Context, onmetalClient client.Client, namespace string, node *corev1.Node) (*computev1alpha1.Machine, error) {
 	if node == nil {

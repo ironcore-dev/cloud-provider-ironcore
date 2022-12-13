@@ -19,13 +19,13 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 
 	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
@@ -45,10 +45,7 @@ type onmetalCloudProvider struct {
 	onmetalNamespace string
 	networkName      string
 	loadBalancer     cloudprovider.LoadBalancer
-	instances        cloudprovider.Instances
 	instancesV2      cloudprovider.InstancesV2
-	routes           cloudprovider.Routes
-	zones            cloudprovider.Zones
 }
 
 func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
@@ -80,15 +77,11 @@ func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
 		return nil, fmt.Errorf("unable to create onmetal cluster: %w", err)
 	}
 
-	onmetalClient := onmetalCluster.GetClient()
-	routes := newOnmetalRoutes(onmetalClient)
-
 	klog.V(2).Infof("Successfully setup cloud provider: %s", CloudProviderName)
 	return &onmetalCloudProvider{
 		onmetalCluster:   onmetalCluster,
 		onmetalNamespace: cfg.Namespace,
 		networkName:      cfg.NetworkName,
-		routes:           routes,
 	}, nil
 }
 
@@ -109,7 +102,6 @@ func (o *onmetalCloudProvider) Initialize(clientBuilder cloudprovider.Controller
 		log.Fatalf("Failed to create new cluster: %v", err)
 	}
 
-	//o.instances = newOnmetalInstances(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace)
 	o.instancesV2 = newOnmetalInstancesV2(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace)
 	o.loadBalancer = newOnmetalLoadBalancer(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace, o.networkName)
 
@@ -151,7 +143,7 @@ func (o *onmetalCloudProvider) LoadBalancer() (cloudprovider.LoadBalancer, bool)
 }
 
 func (o *onmetalCloudProvider) Instances() (cloudprovider.Instances, bool) {
-	return o.instances, true
+	return nil, true
 }
 
 func (o *onmetalCloudProvider) InstancesV2() (cloudprovider.InstancesV2, bool) {
