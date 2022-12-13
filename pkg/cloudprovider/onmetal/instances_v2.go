@@ -24,7 +24,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/onmetal/onmetal-api/api/compute/v1alpha1"
+	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
 )
 
 type onmetalInstancesV2 struct {
@@ -69,7 +69,7 @@ func (o *onmetalInstancesV2) InstanceShutdown(ctx context.Context, node *corev1.
 		return false, fmt.Errorf("failed to get machine for node %s: %w", node.Name, err)
 	}
 
-	return machine.Status.State == v1alpha1.MachineStateShutdown, nil
+	return machine.Status.State == computev1alpha1.MachineStateShutdown, nil
 }
 
 func (o *onmetalInstancesV2) InstanceMetadata(ctx context.Context, node *corev1.Node) (*cloudprovider.InstanceMetadata, error) {
@@ -100,12 +100,22 @@ func (o *onmetalInstancesV2) InstanceMetadata(ctx context.Context, node *corev1.
 		}
 	}
 
-	// TODO: handle zone and region
+	providerID := node.Spec.ProviderID
+	if providerID == "" {
+		providerID = fmt.Sprintf("%s://%s/%s", CloudProviderName, o.onmetalNamespace, machine.Name)
+	}
+
+	zone := ""
+	if machine.Spec.MachinePoolRef != nil {
+		zone = machine.Spec.MachinePoolRef.Name
+	}
+
+	// TODO: handle region
 	return &cloudprovider.InstanceMetadata{
-		ProviderID:    node.Spec.ProviderID,
+		ProviderID:    providerID,
 		InstanceType:  machine.Spec.MachineClassRef.Name,
 		NodeAddresses: addresses,
-		Zone:          "",
+		Zone:          zone,
 		Region:        "",
 	}, nil
 }

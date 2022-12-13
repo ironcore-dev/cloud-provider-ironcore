@@ -73,7 +73,6 @@ func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to get onmetal cluster rest config: %w", err)
 	}
-
 	klog.V(2).Infof("Successfully read configuration for cloud provider: %s", CloudProviderName)
 
 	return &onmetalCloudProviderConfig{
