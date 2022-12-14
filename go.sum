@@ -384,8 +384,8 @@ github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLA
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
-github.com/onmetal/controller-utils v0.6.5 h1:n6RJozycMb5oL7GAI03lIIb2vW9gJ6YUvB87aQR0iHA=
-github.com/onmetal/controller-utils v0.6.5/go.mod h1:0jFC1Qgm77WhdaJpEESGdK/u31vvAB57GznDPcp68OI=
+github.com/onmetal/controller-utils v0.6.6 h1:BzAqAoHRZ0uOept+4YMGkP2Px1FmFMfFiicHsMxLeC4=
+github.com/onmetal/controller-utils v0.6.6/go.mod h1:8AjZZw1iLTnewVhy8nLE4F2AFELHGnP/i02fe3zI4a4=
 github.com/onmetal/onmetal-api v0.0.13-0.20221213101226-2fe1607aa3b3 h1:tzcrInwTQZyZ9aCa4y08i8beHylDWC8rEgwuQ5laqWg=
 github.com/onmetal/onmetal-api v0.0.13-0.20221213101226-2fe1607aa3b3/go.mod h1:nzEIl7IzF5ScxBXwHVpNq/3SivXGSRH9eU7XEflYTCw=
 github.com/onsi/ginkgo v0.0.0-20170829012221-11459a886d9c/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
@@ -1014,8 +1014,8 @@ honnef.co/go/tools v0.0.1-2020.1.4/go.mod h1:X/FiERA/W4tHapMX5mGpAtMSVEeEUOyHaw9
 k8s.io/api v0.24.8/go.mod h1:W2RSRCK+eDrYEH4YeuSKrIY90TYYIcW1ojk8Mo6HVOo=
 k8s.io/api v0.25.5 h1:mqyHf7aoaYMpdvO87mqpol+Qnsmo+y09S0PMIXwiZKo=
 k8s.io/api v0.25.5/go.mod h1:RzplZX0Z8rV/WhSTfEvnyd91bBhBQTRWo85qBQwRmb8=
-k8s.io/apiextensions-apiserver v0.25.0 h1:CJ9zlyXAbq0FIW8CD7HHyozCMBpDSiH7EdrSTCZcZFY=
-k8s.io/apiextensions-apiserver v0.25.0/go.mod h1:3pAjZiN4zw7R8aZC5gR0y3/vCkGlAjCazcg1me8iB/E=
+k8s.io/apiextensions-apiserver v0.25.5 h1:iHkMyFGzRgXO8AQlCYPVTVsKLqXvruswirIW8hRji+g=
+k8s.io/apiextensions-apiserver v0.25.5/go.mod h1:TWAHgFssGm050Oe6MhN+Jaeav+ISEl9M/qWsPzq2s3k=
 k8s.io/apimachinery v0.24.8/go.mod h1:WR5z9Lpw2mOAeDg20iSSrEBRQMY0p2YXVdYpUIgSr4o=
 k8s.io/apimachinery v0.25.5 h1:SQomYHvv+aO43qdu3QKRf9YuI0oI8w3RrOQ1qPbAUGY=
 k8s.io/apimachinery v0.25.5/go.mod h1:1S2i1QHkmxc8+EZCIxe/fX5hpldVXk4gvnJInMEb8D4=
