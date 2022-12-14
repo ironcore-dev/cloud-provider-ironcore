@@ -93,7 +93,7 @@ func (o *onmetalCloudProvider) Initialize(clientBuilder cloudprovider.Controller
 		<-stop
 	}()
 
-	cfg, err := clientBuilder.Config(CloudProviderName)
+	cfg, err := clientBuilder.Config("cloud-controller-manager")
 	if err != nil {
 		log.Fatalf("Failed to get config: %v", err)
 	}

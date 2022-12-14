@@ -9,6 +9,3 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: cloud-controller-manager
-  - kind: ServiceAccount
-    name: onmetal
-    namespace: kube-system
