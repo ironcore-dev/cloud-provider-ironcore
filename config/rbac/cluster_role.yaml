@@ -9,3 +9,5 @@ rules:
       - nodes
     verbs:
       - get
+      - watch
+      - list
