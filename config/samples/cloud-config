@@ -1,4 +1,4 @@
-namespace: kube-system
+namespace: default
 # network name for the loadbalancer goes here
 networkname:
 # kubeconfig content goes here
