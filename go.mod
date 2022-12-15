@@ -6,8 +6,8 @@ require (
 	github.com/google/addlicense v1.1.0
 	github.com/onmetal/controller-utils v0.6.6
 	github.com/onmetal/onmetal-api v0.0.13-0.20221213101226-2fe1607aa3b3
-	github.com/onsi/ginkgo/v2 v2.6.0
-	github.com/onsi/gomega v1.24.1
+	github.com/onsi/ginkgo/v2 v2.6.1
+	github.com/onsi/gomega v1.24.2
 	github.com/pkg/errors v0.9.1
 	k8s.io/api v0.25.5
 	k8s.io/apimachinery v0.25.5
@@ -88,7 +88,7 @@ require (
 	go.uber.org/zap v1.21.0 // indirect
 	go4.org/netipx v0.0.0-20220812043211-3cc044ffd68d // indirect
 	golang.org/x/crypto v0.1.0 // indirect
-	golang.org/x/net v0.3.1-0.20221206200815-1e63c2f08a10 // indirect
+	golang.org/x/net v0.4.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220622183110-fd043fe589d2 // indirect
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
 	golang.org/x/sys v0.3.0 // indirect
