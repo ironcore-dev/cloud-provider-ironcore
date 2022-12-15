@@ -20,8 +20,6 @@ import (
 	"strings"
 	"time"
 
-	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
-	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +29,9 @@ import (
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
+	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
 )
 
 type onmetalLoadBalancer struct {
@@ -189,28 +190,14 @@ func WaitLoadbalancerActive(ctx context.Context, clusterName string, service *v1
 func (o *onmetalLoadBalancer) ensureLoadBalancerRouting(ctx context.Context, loadBalancer *networkingv1alpha1.LoadBalancer, nodes []*v1.Node) error {
 	klog.V(2).Info("ensureLoadBalancerRouting - create LoadBalancerRouting for ", loadBalancer.Name)
 
-	var lbrNwInterfaces = []commonv1alpha1.LocalUIDReference{}
-	for _, node := range nodes {
-		machine, err := GetMachineForNode(ctx, o.onmetalClient, o.onmetalNamespace, node)
-		if err != nil {
-			return err
-		}
-
-		for _, nwiface := range machine.Spec.NetworkInterfaces {
-			nwiTemplate := nwiface.Ephemeral.NetworkInterfaceTemplate
-			nwiNwName := nwiTemplate.Spec.NetworkRef.Name
-			if o.networkName == nwiNwName {
-				lbrNwInterfaces = append(lbrNwInterfaces, commonv1alpha1.LocalUIDReference{
-					Name: nwiface.Name,
-					UID:  nwiTemplate.UID,
-				})
-			}
-		}
+	klog.V(4).Info("ensureLoadBalancerRouting - filter NetworkInterfaces with loadbalancer network name")
+	networkInterfaces, err := o.filterNetworkInterfaces(ctx, nodes, loadBalancer.Spec.NetworkRef.Name)
+	if err != nil {
+		return err
 	}
 
 	network := &networkingv1alpha1.Network{}
-	err := o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: string(o.networkName)}, network)
-	if err != nil {
+	if err := o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: string(o.networkName)}, network); err != nil {
 		return fmt.Errorf("failed to get network %s: %w", o.networkName, err)
 	}
 
@@ -227,7 +214,7 @@ func (o *onmetalLoadBalancer) ensureLoadBalancerRouting(ctx context.Context, loa
 			Name: o.networkName,
 			UID:  network.UID,
 		},
-		Destinations: lbrNwInterfaces,
+		Destinations: networkInterfaces,
 	}
 
 	if err := ctrl.SetControllerReference(loadBalancer, loadBalancerRouting, o.onmetalClient.Scheme()); err != nil {
@@ -237,9 +224,32 @@ func (o *onmetalLoadBalancer) ensureLoadBalancerRouting(ctx context.Context, loa
 	return o.onmetalClient.Patch(ctx, loadBalancerRouting, client.Apply, client.FieldOwner(loadbalancerFieldOwner), client.ForceOwnership)
 }
 
+func (o *onmetalLoadBalancer) filterNetworkInterfaces(ctx context.Context, nodes []*v1.Node, networkName string) ([]commonv1alpha1.LocalUIDReference, error) {
+	var networkInterfaces = []commonv1alpha1.LocalUIDReference{}
+	for _, node := range nodes {
+		machine, err := GetMachineForNode(ctx, o.onmetalClient, o.onmetalNamespace, node)
+		if err != nil {
+			return networkInterfaces, err
+		}
+
+		for _, networkInterface := range machine.Spec.NetworkInterfaces {
+			nic := &networkingv1alpha1.NetworkInterface{}
+			if err := o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: networkInterface.Name}, nic); err != nil {
+				return networkInterfaces, cloudprovider.InstanceNotFound
+			}
+			if nic.Spec.NetworkRef.Name == networkName {
+				networkInterfaces = append(networkInterfaces, commonv1alpha1.LocalUIDReference{
+					Name: nic.Name,
+					UID:  nic.UID,
+				})
+			}
+		}
+	}
+	return networkInterfaces, nil
+}
+
 func (o *onmetalLoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	klog.V(4).Info("UpdateLoadBalancer - Check if nodes are present")
-	items := []commonv1alpha1.LocalUIDReference{}
 	loadBalancer := &networkingv1alpha1.LoadBalancer{}
 	lbRouting := &networkingv1alpha1.LoadBalancerRouting{}
 
@@ -257,30 +267,13 @@ func (o *onmetalLoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterNam
 		return cloudprovider.InstanceNotFound
 	}
 
-	klog.V(4).Info("UpdateLoadBalancer - Updating lbRouting Destinations with networkInterfaces")
-	for _, node := range nodes {
-		machine, err := GetMachineForNode(ctx, o.onmetalClient, o.onmetalNamespace, node)
-		if err != nil {
-			return err
-		}
-		for _, networkInterface := range machine.Spec.NetworkInterfaces {
-			nic := &networkingv1alpha1.NetworkInterface{}
-			if err := o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: networkInterface.Name}, nic); err != nil {
-				if !apierrors.IsNotFound(err) {
-					return fmt.Errorf("error getting network interface %v: %w", nic, err)
-				}
-			}
-			if nic.Spec.NetworkRef.Name == loadBalancer.Spec.NetworkRef.Name {
-				item := commonv1alpha1.LocalUIDReference{
-					Name: nic.Name,
-					UID:  nic.UID,
-				}
-				items = append(items, item)
-			}
-		}
+	klog.V(4).Info("UpdateLoadBalancer - Updating lbRouting Destinations with networkInterfaces filtered by loadbalancer network name")
+	networkInterfaces, err := o.filterNetworkInterfaces(ctx, nodes, loadBalancer.Spec.NetworkRef.Name)
+	if err != nil {
+		return err
 	}
 	lbRoutingBase := lbRouting.DeepCopy()
-	lbRouting.Destinations = items
+	lbRouting.Destinations = networkInterfaces
 
 	if err := o.onmetalClient.Patch(ctx, lbRouting, client.MergeFrom(lbRoutingBase)); err != nil {
 		return err
