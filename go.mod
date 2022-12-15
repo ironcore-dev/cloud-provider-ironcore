@@ -6,7 +6,7 @@ require (
 	github.com/google/addlicense v1.1.0
 	github.com/onmetal/controller-utils v0.6.6
 	github.com/onmetal/onmetal-api v0.0.13-0.20221213101226-2fe1607aa3b3
-	github.com/onsi/ginkgo/v2 v2.6.0
+	github.com/onsi/ginkgo/v2 v2.6.1
 	github.com/onsi/gomega v1.24.1
 	github.com/pkg/errors v0.9.1
 	k8s.io/api v0.25.5
