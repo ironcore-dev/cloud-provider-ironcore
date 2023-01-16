@@ -31,13 +31,13 @@ import (
 	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
 	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
 	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
-	"github.com/onmetal/onmetal-api/testutils"
+	"github.com/onmetal/onmetal-api/utils/testing"
 )
 
 const clusterName = "dev"
 
 var _ = Describe("LoadBalancer", func() {
-	ctx := testutils.SetupContext()
+	ctx := testing.SetupContext()
 	ns, networkName := SetupTest(ctx)
 
 	It("Should ensure and update LoadBalancer info", func() {

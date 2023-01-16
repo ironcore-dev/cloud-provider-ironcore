@@ -41,15 +41,15 @@ import (
 	ipamv1alpha1 "github.com/onmetal/onmetal-api/api/ipam/v1alpha1"
 	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
 	storagev1alpha1 "github.com/onmetal/onmetal-api/api/storage/v1alpha1"
-	"github.com/onmetal/onmetal-api/testutils/envtestutils"
-	"github.com/onmetal/onmetal-api/testutils/envtestutils/apiserver"
+	envtestext "github.com/onmetal/onmetal-api/utils/envtest"
+	"github.com/onmetal/onmetal-api/utils/envtest/apiserver"
 )
 
 var (
 	cfg        *rest.Config
 	k8sClient  client.Client
 	testEnv    *envtest.Environment
-	testEnvExt *envtestutils.EnvironmentExtensions
+	testEnvExt *envtestext.EnvironmentExtensions
 	provider   cloudprovider.Interface
 )
 
@@ -78,18 +78,18 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{}
-	testEnvExt = &envtestutils.EnvironmentExtensions{
+	testEnvExt = &envtestext.EnvironmentExtensions{
 		APIServiceDirectoryPaths: []string{
 			modutils.Dir("github.com/onmetal/onmetal-api", "config", "apiserver", "apiservice", "bases"),
 		},
 		ErrorIfAPIServicePathIsMissing: true,
 	}
 
-	cfg, err = envtestutils.StartWithExtensions(testEnv, testEnvExt)
+	cfg, err = envtestext.StartWithExtensions(testEnv, testEnvExt)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	DeferCleanup(envtestutils.StopWithExtensions, testEnv, testEnvExt)
+	DeferCleanup(envtestext.StopWithExtensions, testEnv, testEnvExt)
 
 	Expect(computev1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
 	Expect(ipamv1alpha1.AddToScheme(scheme.Scheme)).To(Succeed())
@@ -115,7 +115,7 @@ var _ = BeforeSuite(func() {
 	Expect(apiSrv.Start()).To(Succeed())
 	DeferCleanup(apiSrv.Stop)
 
-	Expect(envtestutils.WaitUntilAPIServicesReadyWithTimeout(apiServiceTimeout, testEnvExt, k8sClient, scheme.Scheme)).To(Succeed())
+	Expect(envtestext.WaitUntilAPIServicesReadyWithTimeout(apiServiceTimeout, testEnvExt, k8sClient, scheme.Scheme)).To(Succeed())
 })
 
 func SetupTest(ctx context.Context) (*corev1.Namespace, string) {
