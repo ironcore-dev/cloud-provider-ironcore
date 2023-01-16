@@ -90,7 +90,7 @@ var _ = Describe("LoadBalancer", func() {
 		By("creating a network interface")
 		netInterface := &networkingv1alpha1.NetworkInterface{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "my-netinterface",
+				Name:      "machine1-netinterface",
 				Namespace: ns.Name,
 			},
 			Spec: networkingv1alpha1.NetworkInterfaceSpec{
@@ -113,7 +113,7 @@ var _ = Describe("LoadBalancer", func() {
 		By("creating a network interface")
 		netInterface1 := &networkingv1alpha1.NetworkInterface{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "my-netinterface1",
+				Name:      "machine2-netinterface1",
 				Namespace: ns.Name,
 			},
 			Spec: networkingv1alpha1.NetworkInterfaceSpec{
@@ -136,7 +136,7 @@ var _ = Describe("LoadBalancer", func() {
 		By("creating a network interface")
 		netInterface2 := &networkingv1alpha1.NetworkInterface{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "my-netinterface2",
+				Name:      "machine1-netinterface2",
 				Namespace: ns.Name,
 			},
 			Spec: networkingv1alpha1.NetworkInterfaceSpec{
@@ -159,8 +159,8 @@ var _ = Describe("LoadBalancer", func() {
 		By("creating a machine")
 		machine1 := &computev1alpha1.Machine{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "machine2-",
+				Namespace: ns.Name,
+				Name:      "machine1",
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
@@ -168,18 +168,48 @@ var _ = Describe("LoadBalancer", func() {
 
 				NetworkInterfaces: []computev1alpha1.NetworkInterface{
 					{
-						Name: netInterface.Name,
+						Name: "netinterface",
 						NetworkInterfaceSource: computev1alpha1.NetworkInterfaceSource{
-							NetworkInterfaceRef: &corev1.LocalObjectReference{
-								Name: netInterface.Name,
+							Ephemeral: &computev1alpha1.EphemeralNetworkInterfaceSource{
+								NetworkInterfaceTemplate: &networkingv1alpha1.NetworkInterfaceTemplateSpec{
+									Spec: networkingv1alpha1.NetworkInterfaceSpec{
+										NetworkRef: corev1.LocalObjectReference{Name: networkName},
+										IPs:        []networkingv1alpha1.IPSource{{Value: commonv1alpha1.MustParseNewIP("10.0.0.8")}},
+										VirtualIP: &networkingv1alpha1.VirtualIPSource{
+											Ephemeral: &networkingv1alpha1.EphemeralVirtualIPSource{
+												VirtualIPTemplate: &networkingv1alpha1.VirtualIPTemplateSpec{
+													Spec: networkingv1alpha1.VirtualIPSpec{
+														Type:     networkingv1alpha1.VirtualIPTypePublic,
+														IPFamily: corev1.IPv4Protocol,
+													},
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},
 					{
-						Name: netInterface2.Name,
+						Name: "netinterface2",
 						NetworkInterfaceSource: computev1alpha1.NetworkInterfaceSource{
-							NetworkInterfaceRef: &corev1.LocalObjectReference{
-								Name: netInterface2.Name,
+							Ephemeral: &computev1alpha1.EphemeralNetworkInterfaceSource{
+								NetworkInterfaceTemplate: &networkingv1alpha1.NetworkInterfaceTemplateSpec{
+									Spec: networkingv1alpha1.NetworkInterfaceSpec{
+										NetworkRef: corev1.LocalObjectReference{Name: networkName},
+										IPs:        []networkingv1alpha1.IPSource{{Value: commonv1alpha1.MustParseNewIP("10.0.0.9")}},
+										VirtualIP: &networkingv1alpha1.VirtualIPSource{
+											Ephemeral: &networkingv1alpha1.EphemeralVirtualIPSource{
+												VirtualIPTemplate: &networkingv1alpha1.VirtualIPTemplateSpec{
+													Spec: networkingv1alpha1.VirtualIPSpec{
+														Type:     networkingv1alpha1.VirtualIPTypePublic,
+														IPFamily: corev1.IPv4Protocol,
+													},
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -192,8 +222,8 @@ var _ = Describe("LoadBalancer", func() {
 		By("creating a machine")
 		machine2 := &computev1alpha1.Machine{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "machine3-",
+				Namespace: ns.Name,
+				Name:      "machine2",
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
@@ -201,10 +231,25 @@ var _ = Describe("LoadBalancer", func() {
 
 				NetworkInterfaces: []computev1alpha1.NetworkInterface{
 					{
-						Name: netInterface1.Name,
+						Name: "netinterface1",
 						NetworkInterfaceSource: computev1alpha1.NetworkInterfaceSource{
-							NetworkInterfaceRef: &corev1.LocalObjectReference{
-								Name: netInterface1.Name,
+							Ephemeral: &computev1alpha1.EphemeralNetworkInterfaceSource{
+								NetworkInterfaceTemplate: &networkingv1alpha1.NetworkInterfaceTemplateSpec{
+									Spec: networkingv1alpha1.NetworkInterfaceSpec{
+										NetworkRef: corev1.LocalObjectReference{Name: networkName},
+										IPs:        []networkingv1alpha1.IPSource{{Value: commonv1alpha1.MustParseNewIP("10.0.0.6")}},
+										VirtualIP: &networkingv1alpha1.VirtualIPSource{
+											Ephemeral: &networkingv1alpha1.EphemeralVirtualIPSource{
+												VirtualIPTemplate: &networkingv1alpha1.VirtualIPTemplateSpec{
+													Spec: networkingv1alpha1.VirtualIPSpec{
+														Type:     networkingv1alpha1.VirtualIPTypePublic,
+														IPFamily: corev1.IPv4Protocol,
+													},
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -276,7 +321,7 @@ var _ = Describe("LoadBalancer", func() {
 		nic1 := &networkingv1alpha1.NetworkInterface{}
 		nic2 := &networkingv1alpha1.NetworkInterface{}
 		nic3 := &networkingv1alpha1.NetworkInterface{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns.Name, Name: machine1.Spec.NetworkInterfaces[0].Name}, nic1)).To(Succeed())
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns.Name, Name: netInterface.Name}, nic1)).To(Succeed())
 		if nic1.Spec.NetworkRef.Name == networkName {
 			item := commonv1alpha1.LocalUIDReference{
 				Name: nic1.Name,
@@ -285,7 +330,7 @@ var _ = Describe("LoadBalancer", func() {
 			items = append(items, item)
 		}
 
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns.Name, Name: machine1.Spec.NetworkInterfaces[1].Name}, nic2)).To(Succeed())
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns.Name, Name: netInterface2.Name}, nic2)).To(Succeed())
 		if nic2.Spec.NetworkRef.Name == networkName {
 			item := commonv1alpha1.LocalUIDReference{
 				Name: nic2.Name,
@@ -294,7 +339,7 @@ var _ = Describe("LoadBalancer", func() {
 			items = append(items, item)
 		}
 
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns.Name, Name: machine2.Spec.NetworkInterfaces[0].Name}, nic3)).To(Succeed())
+		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: ns.Name, Name: netInterface1.Name}, nic3)).To(Succeed())
 		if nic3.Spec.NetworkRef.Name == networkName {
 			item := commonv1alpha1.LocalUIDReference{
 				Name: nic3.Name,
