@@ -234,7 +234,8 @@ func (o *onmetalLoadBalancer) filterNetworkInterfaces(ctx context.Context, nodes
 
 		for _, networkInterface := range machine.Spec.NetworkInterfaces {
 			nic := &networkingv1alpha1.NetworkInterface{}
-			if err := o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: networkInterface.Name}, nic); err != nil {
+			nicName := fmt.Sprintf("%s-%s", machine.Name, networkInterface.Name)
+			if err := o.onmetalClient.Get(ctx, types.NamespacedName{Namespace: o.onmetalNamespace, Name: nicName}, nic); err != nil {
 				return networkInterfaces, cloudprovider.InstanceNotFound
 			}
 			if nic.Spec.NetworkRef.Name == networkName {
