@@ -123,7 +123,7 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 		},
 		Spec: networkingv1alpha1.LoadBalancerSpec{
 			Type:       networkingv1alpha1.LoadBalancerTypePublic,
-			IPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			IPFamilies: service.Spec.IPFamilies,
 			NetworkRef: v1.LocalObjectReference{
 				Name: o.networkName,
 			},
