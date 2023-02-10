@@ -17,8 +17,10 @@ package onmetal
 import (
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/pflag"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
@@ -32,9 +34,15 @@ type onmetalCloudProviderConfig struct {
 }
 
 type CloudConfig struct {
-	Namespace   string `json:"namespace"`
-	NetworkName string `json:"networkname"`
-	Kubeconfig  string `json:"kubeconfig"`
+	NetworkName string `json:"networkName"`
+}
+
+var (
+	OnmetalKubeconfigPath string
+)
+
+func AddExtraFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&OnmetalKubeconfigPath, "onmetal-kubeconfig", "", "Path to the onmetal kubeconfig.")
 }
 
 func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
@@ -49,23 +57,20 @@ func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
 		return nil, fmt.Errorf("failed to unmarshal cloud config: %w", err)
 	}
 
-	if cloudConfig.Namespace == "" {
-		return nil, fmt.Errorf("namespace missing in cloud config")
-	}
-
 	if cloudConfig.NetworkName == "" {
 		return nil, fmt.Errorf("networkname missing in cloud config")
 	}
 
-	if cloudConfig.Kubeconfig == "" {
-		return nil, fmt.Errorf("no kubeconfig for the onmetal cluster provided")
+	onmetalKubeconfigData, err := os.ReadFile(OnmetalKubeconfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read onmetal kubeconfig %s: %w", OnmetalKubeconfigPath, err)
 	}
 
-	kubeConfig, err := clientcmd.Load([]byte(cloudConfig.Kubeconfig))
+	onmetalKubeconfig, err := clientcmd.Load(onmetalKubeconfigData)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read onmetal cluster kubeconfig: %w", err)
 	}
-	clientConfig := clientcmd.NewDefaultClientConfig(*kubeConfig, nil)
+	clientConfig := clientcmd.NewDefaultClientConfig(*onmetalKubeconfig, nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to serialize onmetal cluster kubeconfig: %w", err)
 	}
@@ -73,11 +78,18 @@ func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to get onmetal cluster rest config: %w", err)
 	}
+	namespace, _, err := clientConfig.Namespace()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get namespace from onmetal kubeconfig: %w", err)
+	}
+	if namespace == "" {
+		return nil, fmt.Errorf("got a empty namespace from onmetal kubeconfig")
+	}
 	klog.V(2).Infof("Successfully read configuration for cloud provider: %s", CloudProviderName)
 
 	return &onmetalCloudProviderConfig{
 		RestConfig:  restConfig,
-		Namespace:   cloudConfig.Namespace,
+		Namespace:   namespace,
 		NetworkName: cloudConfig.NetworkName,
 	}, nil
 }

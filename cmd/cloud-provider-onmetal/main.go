@@ -16,11 +16,10 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"os"
-	"time"
 
 	"github.com/onmetal/cloud-provider-onmetal/pkg/cloudprovider/onmetal"
+	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
@@ -28,15 +27,12 @@ import (
 	"k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
-
 	_ "k8s.io/component-base/metrics/prometheus/clientgo"
 	_ "k8s.io/component-base/metrics/prometheus/version"
 	"k8s.io/klog/v2"
 )
 
 func main() {
-	rand.Seed(time.Now().UTC().UnixNano())
-
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
@@ -49,6 +45,8 @@ func main() {
 
 	controllerInitializers := app.DefaultInitFuncConstructors
 	namedFlagSets := cliflag.NamedFlagSets{}
+
+	onmetal.AddExtraFlags(pflag.CommandLine)
 
 	command := app.NewCloudControllerManagerCommand(opts, cloudInitializer, controllerInitializers, namedFlagSets, wait.NeverStop)
 

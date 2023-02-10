@@ -20,21 +20,6 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
-	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/controller-manager/pkg/clientbuilder"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"sigs.k8s.io/yaml"
-
 	"github.com/onmetal/controller-utils/buildutils"
 	"github.com/onmetal/controller-utils/modutils"
 	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
@@ -43,6 +28,21 @@ import (
 	storagev1alpha1 "github.com/onmetal/onmetal-api/api/storage/v1alpha1"
 	envtestext "github.com/onmetal/onmetal-api/utils/envtest"
 	"github.com/onmetal/onmetal-api/utils/envtest/apiserver"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/controller-manager/pkg/clientbuilder"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -138,12 +138,32 @@ func SetupTest(ctx context.Context) (*corev1.Namespace, string) {
 		kubeconfigData, err := user.KubeConfig()
 		Expect(err).NotTo(HaveOccurred())
 
+		clientConfig, err := clientcmd.Load(kubeconfigData)
+		Expect(err).NotTo(HaveOccurred())
+		clientConfig.Contexts[clientConfig.CurrentContext].Namespace = ns.Name
+
+		namespacedKubeconfigData, err := clientcmd.Write(*clientConfig)
+		Expect(err).NotTo(HaveOccurred())
+
+		kubeconfigFile, err := os.CreateTemp(GinkgoT().TempDir(), "kubeconfig")
+		Expect(err).NotTo(HaveOccurred())
+		defer func() {
+			_ = kubeconfigFile.Close()
+		}()
+		Expect(os.WriteFile(kubeconfigFile.Name(), namespacedKubeconfigData, 0666)).To(Succeed())
+
+		curr := OnmetalKubeconfigPath
+		defer func() {
+			OnmetalKubeconfigPath = curr
+		}()
+		OnmetalKubeconfigPath = kubeconfigFile.Name()
+
 		cloudConfigFile, err := os.CreateTemp(GinkgoT().TempDir(), "cloud.yaml")
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			_ = cloudConfigFile.Close()
 		}()
-		cloudConfig := CloudConfig{Namespace: ns.Name, NetworkName: networkName, Kubeconfig: string(kubeconfigData)}
+		cloudConfig := CloudConfig{NetworkName: networkName}
 		cloudConfigData, err := yaml.Marshal(&cloudConfig)
 		Expect(err).NotTo(HaveOccurred())
 
