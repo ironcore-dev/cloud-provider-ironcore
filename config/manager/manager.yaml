@@ -22,6 +22,7 @@ spec:
           args:
             - --cloud-provider=onmetal
             - --cloud-config=/etc/cloud/cloud-config
+            - --onmetal-kubeconfig=/etc/onmetal/kubeconfig
             - --kubeconfig=/etc/kubernetes/kubeconfig
             - --authentication-kubeconfig=/etc/kubernetes/kubeconfig
             - --authorization-kubeconfig=/etc/kubernetes/kubeconfig
@@ -37,6 +38,9 @@ spec:
             - mountPath: /etc/kubernetes
               name: kubeconfig
               readOnly: true
+            - mountPath: /etc/onmetal
+              name: onmetalkubeconfig
+              readOnly: true
             - mountPath: /etc/cloud
               name: cloud-config
               readOnly: true
@@ -50,6 +54,9 @@ spec:
         - secret:
             secretName: kubeconfig
           name: kubeconfig
+        - secret:
+            secretName: onmetalkubeconfig
+          name: onmetalkubeconfig
       tolerations:
         - key: node.cloudprovider.kubernetes.io/uninitialized
           value: "true"
