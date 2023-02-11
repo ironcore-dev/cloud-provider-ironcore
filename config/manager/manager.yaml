@@ -18,7 +18,7 @@ spec:
       containers:
         - name: manager
           command:
-            - /bin/onmetal-cloud-provider-manager
+            - /onmetal-cloud-controller-manager
           args:
             - --cloud-provider=onmetal
             - --cloud-config=/etc/cloud/cloud-config
