@@ -20,6 +20,9 @@ import (
 	"testing"
 	"time"
 
+	corev1alpha1 "github.com/onmetal/onmetal-api/api/core/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/resource"
+
 	"github.com/onmetal/controller-utils/buildutils"
 	"github.com/onmetal/controller-utils/modutils"
 	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
@@ -102,7 +105,7 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient).NotTo(BeNil())
 
 	apiSrv, err := apiserver.New(cfg, apiserver.Options{
-		MainPath:     "github.com/onmetal/onmetal-api/onmetal-apiserver/cmd/apiserver",
+		MainPath:     "github.com/onmetal/onmetal-api/cmd/onmetal-apiserver",
 		BuildOptions: []buildutils.BuildOption{buildutils.ModModeMod},
 		ETCDServers:  []string{testEnv.ControlPlane.Etcd.URL.String()},
 		Host:         testEnvExt.APIServiceInstallOptions.LocalServingHost,
@@ -128,6 +131,19 @@ func SetupTest(ctx context.Context) (*corev1.Namespace, string) {
 		}
 		Expect(k8sClient.Create(ctx, ns)).NotTo(HaveOccurred(), "failed to create test namespace")
 		DeferCleanup(k8sClient.Delete, ctx, ns)
+
+		By("creating a machine class")
+		machineClass := &computev1alpha1.MachineClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "machine-class",
+			},
+			Capabilities: corev1alpha1.ResourceList{
+				corev1alpha1.ResourceCPU:    resource.MustParse("1"),
+				corev1alpha1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, machineClass)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, ctx, machineClass)
 
 		user, err := testEnv.AddUser(envtest.User{
 			Name:   "dummy",
