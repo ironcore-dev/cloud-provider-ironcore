@@ -17,5 +17,5 @@ secretGenerator:
       - cloud-config
   - name: onmetalkubeconfig
     files:
-      - onmetalkubeconfig
+      - onmetal/kubeconfig
 
