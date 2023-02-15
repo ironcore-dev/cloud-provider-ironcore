@@ -15,6 +15,7 @@ spec:
         k8s-app: onmetal-cloud-controller-manager
     spec:
       serviceAccountName: cloud-controller-manager
+      hostNetwork: true
       containers:
         - name: manager
           command:
@@ -22,15 +23,30 @@ spec:
           args:
             - --cloud-provider=onmetal
             - --cloud-config=/etc/cloud/cloud-config
-            - --onmetal-kubeconfig=/etc/onmetal/kubeconfig
+            - --onmetal-kubeconfig=/etc/onmetal/onmetalkubeconfig
             - --kubeconfig=/etc/kubernetes/kubeconfig
             - --authentication-kubeconfig=/etc/kubernetes/kubeconfig
             - --authorization-kubeconfig=/etc/kubernetes/kubeconfig
             - --use-service-account-credentials
             - --leader-elect=true
+            - --secure-port=10245
             - --v=2
           image: controller:latest
           imagePullPolicy: IfNotPresent
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              scheme: HTTPS
+              port: healthz
+            successThreshold: 1
+            failureThreshold: 2
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 15
+          ports:
+            - containerPort: 10245
+              name: healthz
+              protocol: TCP
           resources:
             requests:
               cpu: 100m
