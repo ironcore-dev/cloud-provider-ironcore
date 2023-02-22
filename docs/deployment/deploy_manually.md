@@ -30,9 +30,15 @@
 git clone git@github.com:onmetal/cloud-provider-onmetal.git
 cd cloud-provider-onmetal
 ```
+* Create folder ``config/kind/onmetal`` and create kubeconfig into folder ``config/kind/onmetal/kubeconfig``.
 
-* Copy kubeconfig into folder``config/kind/kubeconfig``
+  If you want to use onmetal-api server from different cluster then copy kubeconfig of that cluster into folder ``config/kind/onmetal/kubeconfig``
 
+  If you want to use onmetal-api server from local deployment then copy kubeconfig into folder ``config/kind/onmetal/kubeconfig`` using below command
+```shell
+kind get kubeconfig > ./config/kind/onmetal/kubeconfig
+```
+* Copy kubeconfig into folder ``config/kind/kubeconfig``
 ```shell
 kind get kubeconfig > ./config/kind/kubeconfig
 ```
