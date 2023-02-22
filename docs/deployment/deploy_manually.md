@@ -26,35 +26,35 @@
 ## Steps to Deploy "Cloud-provider-onmetal"
 * To deploy clone the repository [cloud-provider-onmetal](https://github.com/onmetal/cloud-provider-onmetal)
 
-  ```shell
-  git clone git@github.com:onmetal/cloud-provider-onmetal.git
-  cd cloud-provider-onmetal
-  ```
+```shell
+git clone git@github.com:onmetal/cloud-provider-onmetal.git
+cd cloud-provider-onmetal
+```
 * Create folder ``config/kind/onmetal`` and create kubeconfig into folder ``config/kind/onmetal/kubeconfig``.
 
   If you want to use onmetal-api server from different cluster then copy kubeconfig of that cluster into folder ``config/kind/onmetal/kubeconfig``
 
   If you want to use onmetal-api server from local deployment then copy kubeconfig into folder ``config/kind/onmetal/kubeconfig`` using below command
-  ```shell
-  kind get kubeconfig > ./config/kind/onmetal/kubeconfig
-  ```
+```shell
+kind get kubeconfig > ./config/kind/onmetal/kubeconfig
+```
 * Copy kubeconfig into folder ``config/kind/kubeconfig``
-  ```shell
-  kind get kubeconfig > ./config/kind/kubeconfig
-  ```
+```shell
+kind get kubeconfig > ./config/kind/kubeconfig
+```
 * Create cloud-config file under ``./config/kind/`` with the help of sample file present under ``./config/sample/cloud-config``
 
     **Note**: The kubeconfig content here is your onmetal-api cluster's kubeconfig incase of a real kubeadm cluster deployment
 
 * Run below make target to deploy the ``cloud-provider-onmetal``
-  ```shell
-  make kind-deploy
-  ```
+```shell
+make kind-deploy
+```
 **Validation:**
-  ```
-  root@csi-master:~/gitrepo/cloud-provider-onmetal# kubectl  get po -n kube-system -o wide| grep onmetal
-  onmetal-cloud-controller-manager-crws9    1/1     Running   4 (80s ago)     4m13s   10.244.225.76   csi-master
-  ```
+```
+root@csi-master:~/gitrepo/cloud-provider-onmetal# kubectl  get po -n kube-system -o wide| grep onmetal
+onmetal-cloud-controller-manager-crws9    1/1     Running   4 (80s ago)     4m13s   10.244.225.76   csi-master
+```
 
 **Note**: In case that there are multiple environments running, ensure that `kind get clusters` is pointing to the
 default kind cluster.
@@ -63,6 +63,6 @@ default kind cluster.
 
 To remove the cloud-controller from your cluster, simply run
 
-  ```shell
-  make kind-delete
-  ```
+```shell
+make kind-delete
+```
