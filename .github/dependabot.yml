@@ -1,3 +1,4 @@
+---
 version: 2
 updates:
   - package-ecosystem: "gomod"
@@ -6,18 +7,18 @@ updates:
       interval: "daily"
     open-pull-requests-limit: 10
     reviewers:
-      - aiivashchenko
+      - "onmetal/ccm-maintainers"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "daily"
     open-pull-requests-limit: 10
     reviewers:
-      - aiivashchenko
+      - "onmetal/ccm-maintainers"
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "daily"
     open-pull-requests-limit: 10
     reviewers:
-      - aiivashchenko
+      - "onmetal/ccm-maintainers"

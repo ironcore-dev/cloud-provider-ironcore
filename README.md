@@ -6,9 +6,15 @@
 
 The `cloud-provider-onmetal` is the [Kubernetes cloud provider](https://github.com/kubernetes/cloud-provider) implementation for Gardener on Metal.
 
-## Contributing
+## Installation, Usage, and Development
 
-We'd love to get feedback from you. Please report bugs, suggestions or post questions by opening a GitHub issue.
+For more details please refer to documentation folder  [/docs](https://github.com/onmetal/cloud-provider-onmetal/tree/main/docs)
+
+## Feedback and Support
+
+Feedback and contributions are always welcome!
+
+Please report bugs, suggestions or post questions by opening a [Github issue](https://github.com/onmetal/cloud-provider-onmetal/issues).
 
 ## License
 

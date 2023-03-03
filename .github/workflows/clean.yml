@@ -1,4 +1,4 @@
-name: Pull Request Code test
+name: Check
 
 on:
   pull_request:
@@ -16,4 +16,5 @@ jobs:
       - uses: actions/setup-go@v3
         with:
           go-version: 1.19
-      - run: make test
+      - run: go mod tidy
+      - run: hack/check.sh

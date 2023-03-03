@@ -52,7 +52,7 @@ make kind-deploy
 ```
 **Validation:**
 ```
-root@csi-master:~/gitrepo/cloud-provider-onmetal# kubectl  get po -n kube-system -o wide| grep onmetal
+kubectl  get po -n kube-system -o wide| grep onmetal
 onmetal-cloud-controller-manager-crws9    1/1     Running   4 (80s ago)     4m13s   10.244.225.76   csi-master
 ```
 
