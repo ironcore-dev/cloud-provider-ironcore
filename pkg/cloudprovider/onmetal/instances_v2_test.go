@@ -90,7 +90,7 @@ var _ = Describe("InstancesV2", func() {
 		machine.Status.NetworkInterfaces = []computev1alpha1.NetworkInterfaceStatus{{
 			Name:      "my-nic",
 			Phase:     computev1alpha1.NetworkInterfacePhaseBound,
-			IPs:       []commonv1alpha1.IP{{Addr: netip.MustParseAddr("10.0.0.1")}},
+			IPs:       []commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.1")},
 			VirtualIP: &commonv1alpha1.IP{Addr: netip.MustParseAddr("10.0.0.10")},
 		}}
 		Expect(k8sClient.Status().Patch(ctx, machine, client.MergeFrom(machineBase))).To(Succeed())

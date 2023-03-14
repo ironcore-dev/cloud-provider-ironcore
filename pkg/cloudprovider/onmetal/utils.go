@@ -16,14 +16,14 @@ package onmetal
 
 import (
 	"context"
+	"fmt"
 
+	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
 )
 
 func GetMachineForNode(ctx context.Context, onmetalClient client.Client, namespace string, node *corev1.Node) (*computev1alpha1.Machine, error) {
@@ -33,14 +33,14 @@ func GetMachineForNode(ctx context.Context, onmetalClient client.Client, namespa
 	return GetMachineForNodeName(ctx, onmetalClient, namespace, types.NodeName(node.Name))
 }
 
-func GetMachineForNodeName(ctx context.Context, client client.Client, namespace string, nodeName types.NodeName) (*computev1alpha1.Machine, error) {
+func GetMachineForNodeName(ctx context.Context, c client.Client, namespace string, nodeName types.NodeName) (*computev1alpha1.Machine, error) {
 	machine := &computev1alpha1.Machine{}
-	err := client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: string(nodeName)}, machine)
+	err := c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: string(nodeName)}, machine)
 	if apierrors.IsNotFound(err) {
 		return nil, cloudprovider.InstanceNotFound
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get machine object for node %s: %w", nodeName, err)
 	}
 	return machine, nil
 }
