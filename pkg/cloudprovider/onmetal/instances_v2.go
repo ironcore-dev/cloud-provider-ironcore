@@ -70,7 +70,11 @@ func (o *onmetalInstancesV2) InstanceShutdown(ctx context.Context, node *corev1.
 		return false, fmt.Errorf("failed to get machine for node %s: %w", node.Name, err)
 	}
 	nodeShutDown := machine.Status.State == computev1alpha1.MachineStateShutdown
-	klog.V(2).InfoS("Node is shut down", "NodeShutDown", nodeShutDown)
+	if nodeShutDown {
+		klog.V(2).Info("Node is shut down")
+		return nodeShutDown, err
+	}
+	klog.V(2).InfoS("Node is not shut down")
 	return nodeShutDown, nil
 }
 

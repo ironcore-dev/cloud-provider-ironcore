@@ -181,7 +181,6 @@ func waitLoadBalancerActive(ctx context.Context, clusterName string, service *v1
 }
 
 func (o *onmetalLoadBalancer) applyLoadBalancerRoutingForLoadBalancer(ctx context.Context, loadBalancer *networkingv1alpha1.LoadBalancer, nodes []*v1.Node) error {
-	klog.V(2).InfoS("Getting NetworkInterfaces for Nodes")
 	networkInterfaces, err := o.getNetworkInterfacesForNode(ctx, nodes, loadBalancer.Spec.NetworkRef.Name)
 	if err != nil {
 		return fmt.Errorf("failed to get NetworkInterfaces for Nodes: %w", err)
@@ -212,7 +211,6 @@ func (o *onmetalLoadBalancer) applyLoadBalancerRoutingForLoadBalancer(ctx contex
 	if err := o.onmetalClient.Patch(ctx, loadBalancerRouting, client.Apply, loadBalancerFieldOwner, client.ForceOwnership); err != nil {
 		return fmt.Errorf("failed to apply LoadBalancerRouting %s for LoadBalancer %s: %w", client.ObjectKeyFromObject(loadBalancerRouting), client.ObjectKeyFromObject(loadBalancer), err)
 	}
-	klog.V(2).InfoS("Applied LoadBalancerRouting for LoadBalancer", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
 	return nil
 }
 
