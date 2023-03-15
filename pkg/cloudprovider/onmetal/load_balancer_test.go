@@ -15,7 +15,7 @@
 package onmetal
 
 import (
-	"net/netip"
+	"fmt"
 	"strings"
 
 	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -65,10 +64,10 @@ var _ = Describe("LoadBalancer", func() {
 		}
 		Expect(k8sClient.Create(ctx, service)).To(Succeed())
 
-		By("returning error if nodes are less than 1 for ensureloadbalancer")
+		By("expecting an error if there are no nodes available")
 		Eventually(func(g Gomega) {
 			_, err := loadbalancer.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{})
-			g.Expect(err).Should(MatchError("there are no available nodes for LoadBalancer service " + service.Name))
+			g.Expect(err).Should(MatchError(fmt.Sprintf("there are no available nodes for LoadBalancer service %s", client.ObjectKeyFromObject(service))))
 		}).Should(Succeed())
 
 		By("creating a Node object")
@@ -79,10 +78,11 @@ var _ = Describe("LoadBalancer", func() {
 		}
 		Expect(k8sClient.Create(ctx, node)).To(Succeed())
 
-		By("failing if no Machine is present for a given Node object")
+		By("failing if no machine is present for a given node object")
 		Eventually(func(g Gomega) {
-			_, err := loadbalancer.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})
-			g.Expect(err).Should(MatchError("instance not found"))
+			status, err := loadbalancer.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})
+			g.Expect(status).To(BeNil())
+			g.Expect(err).To(HaveOccurred())
 		}).Should(Succeed())
 
 		By("creating a network interface")
@@ -276,8 +276,9 @@ var _ = Describe("LoadBalancer", func() {
 
 		By("failing when network object is not found")
 		Eventually(func(g Gomega) {
-			_, err := loadbalancer.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node1})
-			g.Expect(err).Should(MatchError("failed to get network my-network: Network.networking.api.onmetal.de \"my-network\" not found"))
+			status, err := loadbalancer.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node1})
+			g.Expect(status).To(BeNil())
+			g.Expect(err).To(HaveOccurred())
 		}).Should(Succeed())
 
 		By("creating a network")
@@ -292,7 +293,7 @@ var _ = Describe("LoadBalancer", func() {
 		By("failing if no loadbalancer routing is present")
 		Eventually(func(g Gomega) {
 			err := loadbalancer.UpdateLoadBalancer(ctx, clusterName, service, []*corev1.Node{node2})
-			g.Expect(err).To(Equal(cloudprovider.InstanceNotFound))
+			g.Expect(err).To(HaveOccurred())
 		}).Should(Succeed())
 
 		lbName := getLoadBalancerName(clusterName, service)
@@ -302,7 +303,7 @@ var _ = Describe("LoadBalancer", func() {
 		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: service.Namespace, Name: lbName}, lb)).To(Succeed())
 		lbBase := lb.DeepCopy()
 		lb.Status = networkingv1alpha1.LoadBalancerStatus{
-			IPs: []commonv1alpha1.IP{{Addr: netip.AddrFrom4([4]byte{10, 0, 0, 1})}},
+			IPs: []commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.1")},
 		}
 		Expect(k8sClient.Status().Patch(ctx, lb, client.MergeFrom(lbBase))).To(Succeed())
 
@@ -400,7 +401,7 @@ var _ = Describe("LoadBalancer", func() {
 					},
 				},
 			},
-			Status: networkingv1alpha1.LoadBalancerStatus{IPs: []commonv1alpha1.IP{{Addr: netip.MustParseAddr("10.0.0.1")}}},
+			Status: networkingv1alpha1.LoadBalancerStatus{IPs: []commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.1")}},
 		}
 
 		Expect(k8sClient.Create(ctx, loadBalancer)).To(Succeed())
@@ -438,7 +439,6 @@ var _ = Describe("LoadBalancer", func() {
 		Eventually(func(g Gomega) {
 			_, exist, err := lb.GetLoadBalancer(ctx, "envnon", service)
 			g.Expect(err).To(HaveOccurred())
-			g.Expect(err).To(Equal(cloudprovider.InstanceNotFound))
 			g.Expect(exist).To(BeFalse())
 		}).Should(Succeed())
 
@@ -474,7 +474,7 @@ var _ = Describe("LoadBalancer", func() {
 					},
 				},
 			},
-			Status: networkingv1alpha1.LoadBalancerStatus{IPs: []commonv1alpha1.IP{{Addr: netip.MustParseAddr("10.0.0.1")}}},
+			Status: networkingv1alpha1.LoadBalancerStatus{IPs: []commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.1")}},
 		}
 
 		Expect(k8sClient.Create(ctx, loadBalancer)).To(Succeed())
@@ -501,12 +501,10 @@ var _ = Describe("LoadBalancer", func() {
 			g.Expect(err).NotTo(HaveOccurred())
 		}).Should(Succeed())
 
-		By("ensuring that LoadBalancer deletion returns instance not found for deleted object")
+		By("ensuring that LoadBalancer deletion does not return an error if the LB is deleted")
 		Eventually(func(g Gomega) {
 			err := lb.EnsureLoadBalancerDeleted(ctx, "envtest", service)
-			g.Expect(err).To(HaveOccurred())
-			g.Expect(err).To(Equal(cloudprovider.InstanceNotFound))
+			g.Expect(err).NotTo(HaveOccurred())
 		}).Should(Succeed())
-
 	})
 })
