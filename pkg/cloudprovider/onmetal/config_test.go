@@ -20,73 +20,114 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/clientcmd/api"
+	"sigs.k8s.io/yaml"
 )
 
-var _ = Describe("Instances", func() {
-	const (
-		configSample = `
-networkName: my-network
-`
-		kubeconfigWrongSample = `---`
-		kubeconfigSample      = `---
-apiVersion: v1
-clusters:
-- cluster:
-    certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUM1ekNDQWMrZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRJeE1ETXlOakU0TURRek0xb1hEVE14TURNeU5ERTRNRFF6TTFvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBTW13Cms4VTBtbUpobjdBNUlTelV4WDhLUlFKa0dSUVR3ZEUyeUVUNytIU1k3T05BdHhaQUZTeW1wZVlwd2JyNnQ4R0EKK1RIb1Z0aThVQ0hPa2NnK01wUzJselJMWWIzL1FFbmN1RDlYZjFLWUVoMDNSaHlJMXIzNFpreFJsTmRJQ2VGbgpueEhzZkNDZXJSaEJvY1djbE45QXBqTXI0ZCtkU3lCMU8zdEx3L2FrSXltQWlGWDBkaUxPRWlrSWtZcmhqMXVmCmxTU3ZNNWZnUFF2NnlKZHNOSU1uZWJkQnRtVTdNdWgyOGRBdTd1UHhmdUo5dEZZeEovMDBiWFBtNzFVT0VwaVIKeXZJRDZVdmJmME5nVHo0bE9JUWlxb3QxOVUwcmNvMWhudml1MFBlaGhSQkx2TmVsOS9wTHZhWG55ajQ2b1dyQwphU0NIVDU1YVVvN2hLNURFUmI4Q0F3RUFBYU5DTUVBd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWRFd0VCCi93UUZNQU1CQWY4d0hRWURWUjBPQkJZRUZHQVovUWRJOVhOcWU5M3AwSGVtNkxUTU9meXNNQTBHQ1NxR1NJYjMKRFFFQkN3VUFBNElCQVFDYmUvdlIvSy84OVcydUcyTmlvVE8wcExBMkZtTHF1TjJxZmZjOXU5cjVBZEpSeE9WNAppeGZtZXdSanY0OXg0eHZRWkVzZnE5a0ltd3FGRjliZ3Bwelo0Nk4yaUJTRTg3eTIwazNZUmdiYVZ0UTlvRGE2CkI5SzkzWUluVkxtaXphTytiVTZLT3RMNWVWTWxnTDFpMEp2Y3hoSjFkTmdRL0prd3VoV0dYbkVQNE9qMittSGoKek5lTTFYWDkzKzhIUHNxQlkwWUQ5Qy9YdXNtT3NJOGl4RGZsZ3M3OXJha3Njd0JtMyt2dUE0RENDZnp5NHNqdwpIeUtac2RXK0tCRTN1SlJEeGIyaHo4TStKZkY2SFM3ZWhwNTVQS1poc3lLaGlWUjIxY2RpYmY2YVh6eUtHYXdICmNsRWN4Q3h3NnMwQ3JtZW5keHRmWm5oQTIzeE1KYzE2YjVXSgotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
-    server: "https://127.0.0.1:6443"
-  name: cluster.local
-contexts:
-  - context:
-      cluster: cluster.local
-      user: kubernetes-admin-cluster.local
-      namespace: test
-    name: kubernetes-admin-cluster.local@cluster.local
-current-context: kubernetes-admin-cluster.local@cluster.local
-kind: Config
-preferences: { }
-users:
-- name: kubernetes-admin-cluster.local
-  user:
-    client-certificate-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURFekNDQWZ1Z0F3SUJBZ0lJVW9xZ0hjWTE0Qmt3RFFZSktvWklodmNOQVFFTEJRQXdGVEVUTUJFR0ExVUUKQXhNS2EzVmlaWEp1WlhSbGN6QWVGdzB5TVRBek1qWXhPREEwTXpOYUZ3MHlNakF6TWpZeE9EQTJNVGRhTURReApGekFWQmdOVkJBb1REbk41YzNSbGJUcHRZWE4wWlhKek1Sa3dGd1lEVlFRREV4QnJkV0psY201bGRHVnpMV0ZrCmJXbHVNSUlCSWpBTkJna3Foa2lHOXcwQkFRRUZBQU9DQVE4QU1JSUJDZ0tDQVFFQXV4M1lIZDhJckU4RjU1VW8KOWJLbDZtdDBvenBUcVpQamNJckVaenFqRjg2OEQrTlgzSDhrTzI3WDRyYzE5QTIrdHZiOGlRaWg3U3dXUXNFRgp2c1pNM3AwQktsSGdmMkNzdXM1WkJxTW90TWtSNVlEM0lXRkhaSll3d1hmaFNIK1lwYS9jQU5xYm02TjZDUnZvCm5sdUtYWURiT0NsT043VWxsZ0VUeFdGSkpIQzhvNDZMa1VhbllmZVk5UEp3TVZSQXdJSVVhV2RNNnJuZktvVGMKSHZKNE1VZ2ovYkpSblhQOGpYZW5wRTZBR0ZSWkpPVFlncEFpOStiMFhYNWZTNXRNQTh6YWwzZWtvclBEK0hCTAorZUpsVVo3R1lHMndvNGlzdC9JQVZmMWhURlF4YVhIUndBc3J3NDNsZlN4N3k0Y05TZjdFL1A1NzlYMzNvWmdjCm9GN3RmUUlEQVFBQm8wZ3dSakFPQmdOVkhROEJBZjhFQkFNQ0JhQXdFd1lEVlIwbEJBd3dDZ1lJS3dZQkJRVUgKQXdJd0h3WURWUjBqQkJnd0ZvQVVZQm45QjBqMWMycDczZW5RZDZib3RNdzUvS3d3RFFZSktvWklodmNOQVFFTApCUUFEZ2dFQkFMYVB1T3FjQ2Erck5GcmhWUUZQeUk5ZHc4ZkhLTTluZ2ZsQWg3U28rMy9Wc2J0dnBXNnMwYWtWCnR4cGNPeXpySU5kRllqeXI0SUp0NGhjdW41bWliaU5WTGlZdWRJVkx1NUF6U2lYTjJmbStXcGpMakErcmRxYTkKaTJZd0NndnNUS1pka0VUbkJrRURZTFduNUFNRVBjckJiM3dGUndGeHF0dmt1VnVGS21sVWE5ckRPUnlXMW5vWApIUmFxbmFYalNvNXR3Q3d5K1JEVmxUczR5Y2tGa1hJR25TM3VpVjgxYmRpMXoySTlrN05KazFnNDVBU0lzZUQrClJ2WTNzSEp2YnE0QTJEUjBDOXhGMFl1K1FqQ0JnTkNMMzVWZlF1a3pBNjRiWUVQRjBiK0hOdkk2Rit1YzF6MVUKb2ZzNXhMOUNYeDJwcmtxY04wcGxickRrc3FiL1lyOD0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
-    client-key-data: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcEFJQkFBS0NBUUVBdXgzWUhkOElyRThGNTVVbzliS2w2bXQwb3pwVHFaUGpjSXJFWnpxakY4NjhEK05YCjNIOGtPMjdYNHJjMTlBMit0dmI4aVFpaDdTd1dRc0VGdnNaTTNwMEJLbEhnZjJDc3VzNVpCcU1vdE1rUjVZRDMKSVdGSFpKWXd3WGZoU0grWXBhL2NBTnFibTZONkNSdm9ubHVLWFlEYk9DbE9ON1VsbGdFVHhXRkpKSEM4bzQ2TAprVWFuWWZlWTlQSndNVlJBd0lJVWFXZE02cm5mS29UY0h2SjRNVWdqL2JKUm5YUDhqWGVucEU2QUdGUlpKT1RZCmdwQWk5K2IwWFg1ZlM1dE1BOHphbDNla29yUEQrSEJMK2VKbFVaN0dZRzJ3bzRpc3QvSUFWZjFoVEZReGFYSFIKd0Fzcnc0M2xmU3g3eTRjTlNmN0UvUDU3OVgzM29aZ2NvRjd0ZlFJREFRQUJBb0lCQUFHaTBDbnFza3UzWVNqVwpNQVo5Nmw5elV4QytTTTc1d1FwUjNFZSt4b0JGeVhVbUdyV04wd1pHQU5NMW9ONGlaS0Y2NVZoWlgva1A0cDN3CnpCa1A2TW9sZTBZZ2N5TUorRmlseHpkOG83VjQ4SlFlSFlzSUs3U2diNHF4ZnFIQW85Z0hBcGhyVU9MNmVlMnMKZGNzMHA3QUxtVjhUVldDOVQ3ZlJDSmc0TW9pRUEvNXZtK3FXZHlFLzFLSEdvbG1vSkx4clN1VlI5KytwZVhTOQptcWhRVGZtblNKcWs0RnhPNXRKd01YQnhmejg2MEJWbXlLQ3BLTlQzWVJDbFZBbVlqRlZrc1BMSnlQZWpNTzNDCnRiUVRybHZGL1lCWmlXMW5GeHY0OUtUdThoY0hvcXdrYVhJd0VOTUxVbEVHbE8rTUNrS3pNY0V6Umk0VkdsamwKSENMeFJ1RUNnWUVBMmI1ZXh3T2FmcXE3LzVvZVQzNGdkTVlIaDlqVHQvN0dqc0cxRjVTSThHWUNLcWd6ZHBCVApCZnh3WHhZNFBmZ2gzYkxNUFNobFRod20vVHVvUlE5a0w3cTJGSVp4MHlrYVNwVU9PbmFndVRFRVFoZHRXYUtjCmdNdHh0R2RacnJocU1oTmJ0cVFiNGxFbWliVlhqcXh5V1I5SjA2NUZtS3JyZlQyc1h4RHVlaGtDZ1lFQTIvM3YKdU5sei9mUUM2WUN2YjZZR2YxUkVXVnZyQ016d2xLdGFpU2dqdEgxclkwQklXUFZWTFY0VythT1BlTUVDRjBYcwp6MjBHM3FHVFJqTVZyMzJoQnQzYVRwQjR2MnBXcHZzQUJLYlRrblZWbDFnc3EzaHREMDFyNnBYcVJ1cTEyN0dqCkJkZkwvSTJYY3R1SS9ncUtTbVhzbGYxbG5sUkdWY0dKNGl3U1F3VUNnWUVBdCtrOU1DYnhCTys4WG9XVCtGeDEKbVd2eHpHSHRZVWxGK0NuUWhSd21GYlp6T2doYmYxY2phTGp4U0w4QnZnV294UkpSdzQ0dEVxNWdtQjhkWDBkQwp2YldjT1BYZGloYjdaK2RCMzB0M01UUWZmcHMrOXlpTHU1VWFjdCtnTmh6NVJWWm9ibmxxTzl1REMya3BqUTVHCmZ0UVlqVHh5K0NIVlNURWdPQ09hNlhFQ2dZRUFsYmIrd3dVeVBEMHBFakppc3BBQjBmdk9QQ1lqRVMwditXMlkKUXNtUGF4RUQyVnJ4SWFGczQyQXFNS0NRVG5URDhJVEZBZkZJQUpGamdoM1gvME4zS0E0cHVOZjNaUVdBalVrNgpuTy9RQXRkWmRaTXJhMUtjbmhKcGhBK2NqY0RFSFF5S1RycXE5MmlCRGtpN3RYQUU1MWJ3S0s5M3pjVzZ6RGZYCmw1VzRvK1VDZ1lBT1hYNkxYbXJ0aFI5c0RRa2RzMFkzK0sxS2xKbGU4WlFzbzJzbk5NbHE5a2pYVVFkR3BhanYKRU5CdHV0alMyaTFPbm9weEoxTVJPUzRUa2Z4TDRjZHoydjJYbUxXRUhNemtvVGdEOU1tS1lrdGd4ZStUWXdnUQo2MjVJK3N2c0ptR0xHZHE0aGNxaU9jNDdrTFl3RnozTkRBQXkvR0xSWUVBV0w1ajF1cE9Ub2c9PQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo=`
-	)
+var _ = Describe("Config", func() {
+	It("Should load a correct provider config", func() {
+		sampleConfig := map[string]string{"networkName": "my-network"}
+		sampleConfigData, err := yaml.Marshal(sampleConfig)
+		Expect(err).NotTo(HaveOccurred())
 
-	It("Should read cloud config", func() {
-		configReader := strings.NewReader(configSample)
+		kubeconfig := api.Config{
+			Kind:       "Config",
+			APIVersion: "v1",
+			Clusters: map[string]*api.Cluster{"foo": &api.Cluster{
+				Server:                   "https://server",
+				CertificateAuthorityData: []byte("12345"),
+			}},
+			AuthInfos: map[string]*api.AuthInfo{
+				"foo": {
+					ClientCertificateData: []byte("12345"),
+					ClientKeyData:         []byte("12345"),
+					Username:              "user",
+				},
+			},
+			Contexts: map[string]*api.Context{
+				"foo": {
+					Cluster:   "foo",
+					AuthInfo:  "user",
+					Namespace: "test",
+				},
+			},
+			CurrentContext: "foo",
+		}
+		kubeconfigData, err := clientcmd.Write(kubeconfig)
+		Expect(err).NotTo(HaveOccurred())
+
+		configReader := strings.NewReader(string(sampleConfigData))
 		kubeconfigFile, err := os.CreateTemp(GinkgoT().TempDir(), "kubeconfig")
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			_ = kubeconfigFile.Close()
 		}()
-		Expect(os.WriteFile(kubeconfigFile.Name(), []byte(kubeconfigSample), 0666)).To(Succeed())
-		curr := OnmetalKubeconfigPath
-		defer func() {
-			OnmetalKubeconfigPath = curr
-		}()
+		Expect(os.WriteFile(kubeconfigFile.Name(), kubeconfigData, 0666)).To(Succeed())
 		OnmetalKubeconfigPath = kubeconfigFile.Name()
-
-		config, err := NewConfig(configReader)
+		config, err := LoadCloudProviderConfig(configReader)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(config.RestConfig).NotTo(BeNil())
-		Expect(config.Namespace).NotTo(BeNil())
-		Expect(config.NetworkName).NotTo(BeNil())
+		Expect(config.Namespace).To(Equal("test"))
+		Expect(config.NetworkName).To(Equal("my-network"))
 	})
 
-	It("Should fail on empty cloud config", func() {
-		configReader := strings.NewReader(configSample)
+	It("Should should get the default namespace if no namespace was defined for an auth context", func() {
+		sampleConfig := map[string]string{"networkName": "my-network"}
+		sampleConfigData, err := yaml.Marshal(sampleConfig)
+		Expect(err).NotTo(HaveOccurred())
+
+		kubeconfig := api.Config{
+			Kind:       "Config",
+			APIVersion: "v1",
+			Clusters: map[string]*api.Cluster{"foo": &api.Cluster{
+				Server:                   "https://server",
+				CertificateAuthorityData: []byte("12345"),
+			}},
+			AuthInfos: map[string]*api.AuthInfo{
+				"foo": {
+					ClientCertificateData: []byte("12345"),
+					ClientKeyData:         []byte("12345"),
+					Username:              "user",
+				},
+			},
+			Contexts: map[string]*api.Context{
+				"foo": {
+					Cluster:   "foo",
+					AuthInfo:  "user",
+					Namespace: "",
+				},
+			},
+			CurrentContext: "foo",
+		}
+		kubeconfigData, err := clientcmd.Write(kubeconfig)
+		Expect(err).NotTo(HaveOccurred())
+
+		configReader := strings.NewReader(string(sampleConfigData))
 		kubeconfigFile, err := os.CreateTemp(GinkgoT().TempDir(), "kubeconfig")
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			_ = kubeconfigFile.Close()
 		}()
-		Expect(os.WriteFile(kubeconfigFile.Name(), []byte(kubeconfigWrongSample), 0666)).To(Succeed())
-		curr := OnmetalKubeconfigPath
-		defer func() {
-			OnmetalKubeconfigPath = curr
-		}()
+		Expect(os.WriteFile(kubeconfigFile.Name(), kubeconfigData, 0666)).To(Succeed())
 		OnmetalKubeconfigPath = kubeconfigFile.Name()
-		config, err := NewConfig(configReader)
-		Expect(err).To(HaveOccurred())
+		config, err := LoadCloudProviderConfig(configReader)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(config.RestConfig).NotTo(BeNil())
+		// TODO: empty or unset namespace will be defaulted to the 'default' namespace. We might want to handle this
+		// as an error.
+		Expect(config.Namespace).To(Equal("default"))
+		Expect(config.NetworkName).To(Equal("my-network"))
+	})
+
+	It("Should fail on empty cloud provider config", func() {
+		emptyConfig := map[string]string{"networkName": ""}
+		configData, err := yaml.Marshal(emptyConfig)
+		Expect(err).NotTo(HaveOccurred())
+
+		configReader := strings.NewReader(string(configData))
+		config, err := LoadCloudProviderConfig(configReader)
+		Expect(err.Error()).To(Equal("networkName missing in cloud config"))
 		Expect(config).To(BeNil())
 	})
 })

@@ -108,7 +108,7 @@ func (o *onmetalInstancesV2) InstanceMetadata(ctx context.Context, node *corev1.
 
 	providerID := node.Spec.ProviderID
 	if providerID == "" {
-		providerID = fmt.Sprintf("%s://%s/%s", CloudProviderName, o.onmetalNamespace, machine.Name)
+		providerID = fmt.Sprintf("%s://%s/%s", ProviderName, o.onmetalNamespace, machine.Name)
 	}
 
 	zone := ""

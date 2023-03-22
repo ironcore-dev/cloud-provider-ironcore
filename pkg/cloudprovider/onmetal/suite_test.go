@@ -49,11 +49,11 @@ import (
 )
 
 var (
-	cfg        *rest.Config
-	k8sClient  client.Client
-	testEnv    *envtest.Environment
-	testEnvExt *envtestext.EnvironmentExtensions
-	provider   cloudprovider.Interface
+	cfg           *rest.Config
+	k8sClient     client.Client
+	testEnv       *envtest.Environment
+	testEnvExt    *envtestext.EnvironmentExtensions
+	cloudProvider cloudprovider.Interface
 )
 
 const (
@@ -182,11 +182,7 @@ func SetupTest(ctx context.Context) (*corev1.Namespace, string) {
 		cloudConfig := CloudConfig{NetworkName: networkName}
 		cloudConfigData, err := yaml.Marshal(&cloudConfig)
 		Expect(err).NotTo(HaveOccurred())
-
 		Expect(os.WriteFile(cloudConfigFile.Name(), cloudConfigData, 0666)).To(Succeed())
-
-		provider, err = InitCloudProvider(cloudConfigFile)
-		Expect(err).NotTo(HaveOccurred())
 
 		ctx, cancel := context.WithCancel(context.Background())
 		DeferCleanup(cancel)
@@ -195,7 +191,9 @@ func SetupTest(ctx context.Context) (*corev1.Namespace, string) {
 		Expect(err).NotTo(HaveOccurred())
 
 		clientBuilder := clientbuilder.NewDynamicClientBuilder(testEnv.Config, k8sClientSet.CoreV1(), "default")
-		provider.Initialize(clientBuilder, ctx.Done())
+		cloudProvider, err = cloudprovider.InitCloudProvider(ProviderName, cloudConfigFile.Name())
+		Expect(err).NotTo(HaveOccurred())
+		cloudProvider.Initialize(clientBuilder, ctx.Done())
 	})
 
 	return ns, networkName

@@ -36,8 +36,6 @@ func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	cloudprovider.RegisterCloudProvider(onmetal.CloudProviderName, onmetal.InitCloudProvider)
-
 	opts, err := options.NewCloudControllerManagerOptions()
 	if err != nil {
 		klog.Fatalf("unable to initialize command options: %v", err)
@@ -61,7 +59,7 @@ func cloudInitializer(config *cloudcontrollerconfig.CompletedConfig) cloudprovid
 	providerName := cloudConfig.Name
 
 	if providerName == "" {
-		providerName = onmetal.CloudProviderName
+		providerName = onmetal.ProviderName
 	}
 
 	// initialize cloud provider with the cloud provider name and config file provided

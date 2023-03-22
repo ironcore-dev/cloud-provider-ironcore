@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-type onmetalCloudProviderConfig struct {
+type cloudProviderConfig struct {
 	RestConfig  *rest.Config
 	Namespace   string
 	NetworkName string
@@ -45,8 +45,8 @@ func AddExtraFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&OnmetalKubeconfigPath, "onmetal-kubeconfig", "", "Path to the onmetal kubeconfig.")
 }
 
-func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
-	klog.V(2).Infof("Reading configuration for cloud provider: %s", CloudProviderName)
+func LoadCloudProviderConfig(f io.Reader) (*cloudProviderConfig, error) {
+	klog.V(2).Infof("Reading configuration for cloud provider: %s", ProviderName)
 	configBytes, err := io.ReadAll(f)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to read in config")
@@ -58,7 +58,7 @@ func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
 	}
 
 	if cloudConfig.NetworkName == "" {
-		return nil, fmt.Errorf("networkname missing in cloud config")
+		return nil, fmt.Errorf("networkName missing in cloud config")
 	}
 
 	onmetalKubeconfigData, err := os.ReadFile(OnmetalKubeconfigPath)
@@ -82,12 +82,14 @@ func NewConfig(f io.Reader) (*onmetalCloudProviderConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get namespace from onmetal kubeconfig: %w", err)
 	}
+	// TODO: empty or unset namespace will be defaulted to the 'default' namespace. We might want to handle this
+	// as an error.
 	if namespace == "" {
 		return nil, fmt.Errorf("got a empty namespace from onmetal kubeconfig")
 	}
-	klog.V(2).Infof("Successfully read configuration for cloud provider: %s", CloudProviderName)
+	klog.V(2).Infof("Successfully read configuration for cloud provider: %s", ProviderName)
 
-	return &onmetalCloudProviderConfig{
+	return &cloudProviderConfig{
 		RestConfig:  restConfig,
 		Namespace:   namespace,
 		NetworkName: cloudConfig.NetworkName,
