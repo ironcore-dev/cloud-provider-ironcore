@@ -45,15 +45,17 @@ func (o *onmetalInstancesV2) InstanceExists(ctx context.Context, node *corev1.No
 	if node == nil {
 		return false, nil
 	}
-	klog.V(2).InfoS("Checking if node exists", "Node", node.Name)
-	_, err := GetMachineForNode(ctx, o.onmetalClient, o.onmetalNamespace, node)
-	if apierrors.IsNotFound(err) {
-		return false, cloudprovider.InstanceNotFound
+	klog.V(4).InfoS("Checking if node exists", "Node", node.Name)
+
+	machine := &computev1alpha1.Machine{}
+	if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: node.Name}, machine); err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, cloudprovider.InstanceNotFound
+		}
+		return false, fmt.Errorf("failed to get machine object for node %s: %w", node.Name, err)
 	}
-	if err != nil {
-		return false, fmt.Errorf("unable to get machine for node %s: %w", node.Name, err)
-	}
-	klog.V(2).InfoS("Node exists", "Node", node.Name)
+
+	klog.V(4).InfoS("Instance for node exists", "Node", node.Name, "Machine", client.ObjectKeyFromObject(machine))
 	return true, nil
 }
 
@@ -61,33 +63,31 @@ func (o *onmetalInstancesV2) InstanceShutdown(ctx context.Context, node *corev1.
 	if node == nil {
 		return false, nil
 	}
-	klog.V(2).InfoS("Checking if instance is shut down", "Node", node.Name)
-	machine, err := GetMachineForNode(ctx, o.onmetalClient, o.onmetalNamespace, node)
-	if apierrors.IsNotFound(err) {
-		return false, cloudprovider.InstanceNotFound
+	klog.V(4).InfoS("Checking if instance is shut down", "Node", node.Name)
+
+	machine := &computev1alpha1.Machine{}
+	if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: node.Name}, machine); err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, cloudprovider.InstanceNotFound
+		}
+		return false, fmt.Errorf("failed to get machine object for node %s: %w", node.Name, err)
 	}
-	if err != nil {
-		return false, fmt.Errorf("failed to get machine for node %s: %w", node.Name, err)
-	}
-	nodeShutDown := machine.Status.State == computev1alpha1.MachineStateShutdown
-	if nodeShutDown {
-		klog.V(2).Info("Node is shut down")
-		return nodeShutDown, err
-	}
-	klog.V(2).InfoS("Node is not shut down")
-	return nodeShutDown, nil
+
+	nodeShutDownStatus := machine.Status.State == computev1alpha1.MachineStateShutdown
+	klog.V(4).InfoS("Instance shut down status", "NodeShutdown", nodeShutDownStatus)
+	return nodeShutDownStatus, nil
 }
 
 func (o *onmetalInstancesV2) InstanceMetadata(ctx context.Context, node *corev1.Node) (*cloudprovider.InstanceMetadata, error) {
 	if node == nil {
 		return nil, nil
 	}
-	machine, err := GetMachineForNode(ctx, o.onmetalClient, o.onmetalNamespace, node)
-	if apierrors.IsNotFound(err) {
-		return nil, cloudprovider.InstanceNotFound
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to get machine for node %s: %w", node.Name, err)
+	machine := &computev1alpha1.Machine{}
+	if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: node.Name}, machine); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, cloudprovider.InstanceNotFound
+		}
+		return nil, fmt.Errorf("failed to get machine object for node %s: %w", node.Name, err)
 	}
 
 	addresses := make([]corev1.NodeAddress, 0)
