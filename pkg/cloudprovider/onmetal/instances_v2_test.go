@@ -104,7 +104,7 @@ var _ = Describe("InstancesV2", func() {
 		Expect(k8sClient.Create(ctx, node)).To(Succeed())
 
 		By("getting the instances v2 interface")
-		instances, ok := provider.InstancesV2()
+		instances, ok := cloudProvider.InstancesV2()
 		Expect(ok).To(BeTrue())
 
 		By("ensuring that an instance for a node exists")
@@ -126,7 +126,7 @@ var _ = Describe("InstancesV2", func() {
 			instanceMetadata, err := instances.InstanceMetadata(ctx, node)
 			g.Expect(err).NotTo(HaveOccurred())
 			g.Expect(instanceMetadata).To(Equal(&cloudprovider.InstanceMetadata{
-				ProviderID:   fmt.Sprintf("%s://%s/%s", CloudProviderName, machine.Namespace, machine.Name),
+				ProviderID:   fmt.Sprintf("%s://%s/%s", ProviderName, machine.Namespace, machine.Name),
 				InstanceType: machine.Spec.MachineClassRef.Name,
 				NodeAddresses: []corev1.NodeAddress{
 					{
@@ -141,6 +141,72 @@ var _ = Describe("InstancesV2", func() {
 				Zone:   "zone1",
 				Region: "",
 			}))
+		}).Should(Succeed())
+	})
+
+	It("Should get InstanceNotFound if no Machine exists for Node", func() {
+		By("creating a node object with a provider ID referencing non existing machine")
+		node := &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+		}
+		Expect(k8sClient.Create(ctx, node)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, ctx, node)
+
+		By("getting the instances v2 interface")
+		instances, ok := cloudProvider.InstancesV2()
+		Expect(ok).To(BeTrue())
+
+		By("ensuring that an instance for a node does not exist")
+		Eventually(func(g Gomega) {
+			ok, err := instances.InstanceExists(ctx, node)
+			g.Expect(err).To(Equal(cloudprovider.InstanceNotFound))
+			g.Expect(ok).To(BeFalse())
+		}).Should(Succeed())
+	})
+
+	It("Should fail to get instance metadata if no Machine exists for Node", func() {
+		By("creating a node object with a provider ID referencing non existing machine")
+		node := &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+		}
+		Expect(k8sClient.Create(ctx, node)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, ctx, node)
+
+		By("getting the instances v2 interface")
+		instances, ok := cloudProvider.InstancesV2()
+		Expect(ok).To(BeTrue())
+
+		By("ensuring to fail getting the instance metadata")
+		Eventually(func(g Gomega) {
+			metaData, err := instances.InstanceMetadata(ctx, node)
+			g.Expect(err).To(Equal(cloudprovider.InstanceNotFound))
+			g.Expect(metaData).To(BeNil())
+		}).Should(Succeed())
+	})
+
+	It("Should fail to get instance shutdown state if no Machine exists for Node", func() {
+		By("creating a node object with a provider ID referencing non existing machine")
+		node := &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+		}
+		Expect(k8sClient.Create(ctx, node)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, ctx, node)
+
+		By("getting the instances v2 interface")
+		instances, ok := cloudProvider.InstancesV2()
+		Expect(ok).To(BeTrue())
+
+		By("ensuring to fail getting the instance metadata")
+		Eventually(func(g Gomega) {
+			ok, err := instances.InstanceShutdown(ctx, node)
+			g.Expect(err).To(Equal(cloudprovider.InstanceNotFound))
+			g.Expect(ok).To(BeFalse())
 		}).Should(Succeed())
 	})
 })

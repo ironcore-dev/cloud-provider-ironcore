@@ -22,7 +22,8 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,11 +36,41 @@ import (
 )
 
 const (
-	CloudProviderName       = "onmetal"
+	ProviderName            = "onmetal"
 	machineMetadataUIDField = ".metadata.uid"
 )
 
-type onmetalCloudProvider struct {
+var onmetalScheme = runtime.NewScheme()
+
+func init() {
+	utilruntime.Must(computev1alpha1.AddToScheme(onmetalScheme))
+	utilruntime.Must(storagev1alpha1.AddToScheme(onmetalScheme))
+	utilruntime.Must(ipamv1alpha1.AddToScheme(onmetalScheme))
+	utilruntime.Must(networkingv1alpha1.AddToScheme(onmetalScheme))
+
+	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
+		cfg, err := LoadCloudProviderConfig(config)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to decode config")
+		}
+
+		onmetalCluster, err := cluster.New(cfg.RestConfig, func(o *cluster.Options) {
+			o.Scheme = onmetalScheme
+			o.Namespace = cfg.Namespace
+		})
+		if err != nil {
+			return nil, fmt.Errorf("unable to create onmetal cluster: %w", err)
+		}
+
+		return &cloud{
+			onmetalCluster:   onmetalCluster,
+			onmetalNamespace: cfg.Namespace,
+			networkName:      cfg.NetworkName,
+		}, nil
+	})
+}
+
+type cloud struct {
 	targetCluster    cluster.Cluster
 	onmetalCluster   cluster.Cluster
 	onmetalNamespace string
@@ -48,45 +79,8 @@ type onmetalCloudProvider struct {
 	instancesV2      cloudprovider.InstancesV2
 }
 
-func InitCloudProvider(config io.Reader) (cloudprovider.Interface, error) {
-	klog.V(2).Infof("Setting up cloud provider: %s", CloudProviderName)
-
-	cfg, err := NewConfig(config)
-	if err != nil {
-		return nil, errors.Wrap(err, "can't decode yaml config")
-	}
-
-	if err := computev1alpha1.AddToScheme(scheme.Scheme); err != nil {
-		return nil, errors.Wrap(err, "unable to add onmetal compute api to scheme")
-	}
-	if err := storagev1alpha1.AddToScheme(scheme.Scheme); err != nil {
-		return nil, errors.Wrap(err, "unable to add onmetal storage api to scheme")
-	}
-	if err := ipamv1alpha1.AddToScheme(scheme.Scheme); err != nil {
-		return nil, errors.Wrap(err, "unable to add onmetal ipam api to scheme")
-	}
-	if err := networkingv1alpha1.AddToScheme(scheme.Scheme); err != nil {
-		return nil, errors.Wrap(err, "unable to add onmetal networking api to scheme")
-	}
-
-	onmetalCluster, err := cluster.New(cfg.RestConfig, func(o *cluster.Options) {
-		o.Scheme = scheme.Scheme
-		o.Namespace = cfg.Namespace
-	})
-	if err != nil {
-		return nil, fmt.Errorf("unable to create onmetal cluster: %w", err)
-	}
-
-	klog.V(2).Infof("Successfully setup cloud provider: %s", CloudProviderName)
-	return &onmetalCloudProvider{
-		onmetalCluster:   onmetalCluster,
-		onmetalNamespace: cfg.Namespace,
-		networkName:      cfg.NetworkName,
-	}, nil
-}
-
-func (o *onmetalCloudProvider) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
-	klog.V(2).Infof("Initializing cloud provider: %s", CloudProviderName)
+func (o *cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+	klog.V(2).Infof("Initializing cloud provider: %s", ProviderName)
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		defer cancel()
@@ -135,37 +129,47 @@ func (o *onmetalCloudProvider) Initialize(clientBuilder cloudprovider.Controller
 	if !o.targetCluster.GetCache().WaitForCacheSync(ctx) {
 		log.Fatal("Failed to wait for target cluster cache to sync")
 	}
-	klog.V(2).Infof("Successfully initialized cloud provider: %s", CloudProviderName)
+	klog.V(2).Infof("Successfully initialized cloud provider: %s", ProviderName)
 }
 
-func (o *onmetalCloudProvider) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
+func (o *cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return o.loadBalancer, true
 }
 
-func (o *onmetalCloudProvider) Instances() (cloudprovider.Instances, bool) {
-	return nil, true
+// Instances returns an implementation of Instances for onmetal
+func (o *cloud) Instances() (cloudprovider.Instances, bool) {
+	return nil, false
 }
 
-func (o *onmetalCloudProvider) InstancesV2() (cloudprovider.InstancesV2, bool) {
+// InstancesV2 is an implementation for instances and should only be implemented by external cloud providers.
+// Implementing InstancesV2 is behaviorally identical to Instances but is optimized to significantly reduce
+// API calls to the cloud provider when registering and syncing nodes.
+// Also returns true if the interface is supported, false otherwise.
+func (o *cloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
 	return o.instancesV2, true
 }
 
-func (o *onmetalCloudProvider) Zones() (cloudprovider.Zones, bool) {
+// Zones returns an implementation of Zones for onmetal
+func (o *cloud) Zones() (cloudprovider.Zones, bool) {
 	return nil, false
 }
 
-func (o *onmetalCloudProvider) Clusters() (cloudprovider.Clusters, bool) {
+// Clusters returns the list of clusters
+func (o *cloud) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
 
-func (o *onmetalCloudProvider) Routes() (cloudprovider.Routes, bool) {
+// Routes returns an implementation of Routes for onmetal
+func (o *cloud) Routes() (cloudprovider.Routes, bool) {
 	return nil, false
 }
 
-func (o *onmetalCloudProvider) ProviderName() string {
-	return CloudProviderName
+// ProviderName returns the cloud provider ID
+func (o *cloud) ProviderName() string {
+	return ProviderName
 }
 
-func (o *onmetalCloudProvider) HasClusterID() bool {
+// HasClusterID returns true if the cluster has a clusterID
+func (o *cloud) HasClusterID() bool {
 	return true
 }

@@ -40,7 +40,7 @@ var _ = Describe("LoadBalancer", func() {
 
 	It("Should ensure and update LoadBalancer info", func() {
 		By("getting the LoadBalancer interface")
-		loadbalancer, ok := provider.LoadBalancer()
+		loadbalancer, ok := cloudProvider.LoadBalancer()
 		Expect(ok).To(BeTrue())
 
 		By("creating a LoadBalancer type service")
@@ -296,7 +296,7 @@ var _ = Describe("LoadBalancer", func() {
 			g.Expect(err).To(HaveOccurred())
 		}).Should(Succeed())
 
-		lbName := getLoadBalancerName(clusterName, service)
+		lbName := getLoadBalancerNameForService(clusterName, service)
 
 		By("patching public IP into loadbalancer status")
 		lb := &networkingv1alpha1.LoadBalancer{}
@@ -406,7 +406,7 @@ var _ = Describe("LoadBalancer", func() {
 
 		Expect(k8sClient.Create(ctx, loadBalancer)).To(Succeed())
 		By("getting the loadbalancer interface")
-		lb, ok := provider.LoadBalancer()
+		lb, ok := cloudProvider.LoadBalancer()
 		Expect(ok).To(BeTrue())
 
 		service := &corev1.Service{
@@ -479,7 +479,7 @@ var _ = Describe("LoadBalancer", func() {
 
 		Expect(k8sClient.Create(ctx, loadBalancer)).To(Succeed())
 		By("getting the loadbalancer interface")
-		lb, ok := provider.LoadBalancer()
+		lb, ok := cloudProvider.LoadBalancer()
 		Expect(ok).To(BeTrue())
 
 		service := &corev1.Service{

@@ -77,7 +77,7 @@ func (o *onmetalLoadBalancer) GetLoadBalancer(ctx context.Context, clusterName s
 }
 
 func (o *onmetalLoadBalancer) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
-	return getLoadBalancerName(clusterName, service)
+	return getLoadBalancerNameForService(clusterName, service)
 }
 
 func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
@@ -87,7 +87,7 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 		return nil, fmt.Errorf("there are no available nodes for LoadBalancer service %s", client.ObjectKeyFromObject(service))
 	}
 
-	loadBalancerName := getLoadBalancerName(clusterName, service)
+	loadBalancerName := getLoadBalancerNameForService(clusterName, service)
 	klog.V(2).InfoS("Getting LoadBalancer ports from Service", "Service", client.ObjectKeyFromObject(service))
 	lbPorts := []networkingv1alpha1.LoadBalancerPort{}
 	for _, svcPort := range service.Spec.Ports {
@@ -149,7 +149,7 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 	return &v1.LoadBalancerStatus{Ingress: lbIngress}, nil
 }
 
-func getLoadBalancerName(clusterName string, service *v1.Service) string {
+func getLoadBalancerNameForService(clusterName string, service *v1.Service) string {
 	nameSuffix := strings.Split(string(service.UID), "-")[0]
 	return fmt.Sprintf("%s-%s-%s", clusterName, service.Name, nameSuffix)
 }
