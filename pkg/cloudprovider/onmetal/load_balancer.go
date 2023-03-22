@@ -20,9 +20,10 @@ import (
 	"strings"
 	"time"
 
+	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
@@ -63,8 +64,7 @@ func (o *onmetalLoadBalancer) GetLoadBalancer(ctx context.Context, clusterName s
 	klog.V(2).InfoS("Getting LoadBalancer %s", loadBalancerName)
 
 	loadBalancer := &networkingv1alpha1.LoadBalancer{}
-	loadBalancerKey := client.ObjectKey{Namespace: o.onmetalNamespace, Name: loadBalancerName}
-	if err = o.onmetalClient.Get(ctx, loadBalancerKey, loadBalancer); err != nil {
+	if err = o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: loadBalancerName}, loadBalancer); err != nil {
 		return nil, false, fmt.Errorf("failed to get LoadBalancer %s for Service %s: %w", loadBalancerName, client.ObjectKeyFromObject(service), err)
 	}
 
@@ -163,7 +163,7 @@ func waitLoadBalancerActive(ctx context.Context, clusterName string, service *v1
 	}
 
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		err := onmetalClient.Get(ctx, types.NamespacedName{Namespace: service.Namespace, Name: string(loadBalancer.Name)}, loadBalancer)
+		err := onmetalClient.Get(ctx, client.ObjectKey{Namespace: service.Namespace, Name: loadBalancer.Name}, loadBalancer)
 		if err == nil {
 			if len(loadBalancer.Status.IPs) > 0 {
 				return true, nil
@@ -181,7 +181,7 @@ func waitLoadBalancerActive(ctx context.Context, clusterName string, service *v1
 }
 
 func (o *onmetalLoadBalancer) applyLoadBalancerRoutingForLoadBalancer(ctx context.Context, loadBalancer *networkingv1alpha1.LoadBalancer, nodes []*v1.Node) error {
-	networkInterfaces, err := o.getNetworkInterfacesForNode(ctx, nodes, loadBalancer.Spec.NetworkRef.Name)
+	networkInterfaces, err := o.getNetworkInterfacesForNodes(ctx, nodes, loadBalancer.Spec.NetworkRef.Name)
 	if err != nil {
 		return fmt.Errorf("failed to get NetworkInterfaces for Nodes: %w", err)
 	}
@@ -214,12 +214,12 @@ func (o *onmetalLoadBalancer) applyLoadBalancerRoutingForLoadBalancer(ctx contex
 	return nil
 }
 
-func (o *onmetalLoadBalancer) getNetworkInterfacesForNode(ctx context.Context, nodes []*v1.Node, networkName string) ([]commonv1alpha1.LocalUIDReference, error) {
+func (o *onmetalLoadBalancer) getNetworkInterfacesForNodes(ctx context.Context, nodes []*v1.Node, networkName string) ([]commonv1alpha1.LocalUIDReference, error) {
 	var networkInterfaces = []commonv1alpha1.LocalUIDReference{}
 	for _, node := range nodes {
-		machine, err := GetMachineForNode(ctx, o.onmetalClient, o.onmetalNamespace, node)
-		if err != nil {
-			return networkInterfaces, err
+		machine := &computev1alpha1.Machine{}
+		if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: node.Name}, machine); client.IgnoreNotFound(err) != nil {
+			return nil, fmt.Errorf("failed to get machine object for node %s: %w", node.Name, err)
 		}
 
 		for _, machineNIC := range machine.Spec.NetworkInterfaces {
@@ -259,7 +259,7 @@ func (o *onmetalLoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterNam
 	}
 
 	klog.V(2).InfoS("Updating LoadBalancerRouting destinations for LoadBalancer", "LoadBalancerRouting", client.ObjectKeyFromObject(loadBalancerRouting), "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
-	networkInterfaces, err := o.getNetworkInterfacesForNode(ctx, nodes, loadBalancer.Spec.NetworkRef.Name)
+	networkInterfaces, err := o.getNetworkInterfacesForNodes(ctx, nodes, loadBalancer.Spec.NetworkRef.Name)
 	if err != nil {
 		return fmt.Errorf("failed to get NetworkInterfaces for LoadBalancer %s: %w", client.ObjectKeyFromObject(loadBalancer), err)
 	}
