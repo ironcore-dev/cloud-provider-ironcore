@@ -3,7 +3,6 @@ module github.com/onmetal/cloud-provider-onmetal
 go 1.20
 
 require (
-	github.com/google/addlicense v1.1.1
 	github.com/onmetal/controller-utils v0.7.0
 	github.com/onmetal/onmetal-api v0.0.13-0.20230209150448-b34e9ebc560c
 	github.com/onsi/ginkgo/v2 v2.9.1
@@ -28,7 +27,6 @@ require (
 	github.com/antlr/antlr4/runtime/Go/antlr v1.4.10 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
-	github.com/bmatcuk/doublestar/v4 v4.0.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
