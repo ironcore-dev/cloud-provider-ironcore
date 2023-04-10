@@ -208,7 +208,7 @@ func (o *onmetalLoadBalancer) applyLoadBalancerRoutingForLoadBalancer(ctx contex
 		Destinations: networkInterfaces,
 	}
 
-	if err := o.onmetalClient.Patch(ctx, loadBalancerRouting, client.Apply, loadBalancerFieldOwner, client.ForceOwnership); err != nil {
+	if err := o.onmetalClient.Patch(ctx, loadBalancerRouting, client.Apply, client.FieldOwner(loadBalancerFieldOwner), client.ForceOwnership); err != nil {
 		return fmt.Errorf("failed to apply LoadBalancerRouting %s for LoadBalancer %s: %w", client.ObjectKeyFromObject(loadBalancerRouting), client.ObjectKeyFromObject(loadBalancer), err)
 	}
 	return nil
