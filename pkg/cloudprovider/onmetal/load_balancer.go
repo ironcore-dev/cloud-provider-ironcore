@@ -20,6 +20,8 @@ import (
 	"strings"
 	"time"
 
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
 	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
 
 	v1 "k8s.io/api/core/v1"
@@ -208,14 +210,18 @@ func (o *onmetalLoadBalancer) applyLoadBalancerRoutingForLoadBalancer(ctx contex
 		Destinations: networkInterfaces,
 	}
 
-	if err := o.onmetalClient.Patch(ctx, loadBalancerRouting, client.Apply, client.FieldOwner(loadBalancerFieldOwner), client.ForceOwnership); err != nil {
+	if err := controllerutil.SetOwnerReference(loadBalancer, loadBalancerRouting, o.onmetalClient.Scheme()); err != nil {
+		return fmt.Errorf("failed to set owner reference for load balancer routing %s: %w", client.ObjectKeyFromObject(loadBalancerRouting), err)
+	}
+
+	if err := o.onmetalClient.Patch(ctx, loadBalancerRouting, client.Apply, loadBalancerFieldOwner, client.ForceOwnership); err != nil {
 		return fmt.Errorf("failed to apply LoadBalancerRouting %s for LoadBalancer %s: %w", client.ObjectKeyFromObject(loadBalancerRouting), client.ObjectKeyFromObject(loadBalancer), err)
 	}
 	return nil
 }
 
 func (o *onmetalLoadBalancer) getNetworkInterfacesForNodes(ctx context.Context, nodes []*v1.Node, networkName string) ([]commonv1alpha1.LocalUIDReference, error) {
-	var networkInterfaces = []commonv1alpha1.LocalUIDReference{}
+	var networkInterfaces []commonv1alpha1.LocalUIDReference
 	for _, node := range nodes {
 		machine := &computev1alpha1.Machine{}
 		if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: node.Name}, machine); client.IgnoreNotFound(err) != nil {
