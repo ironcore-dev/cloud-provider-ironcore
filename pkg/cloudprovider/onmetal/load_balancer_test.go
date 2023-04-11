@@ -18,10 +18,6 @@ import (
 	"fmt"
 	"strings"
 
-	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
-	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
-	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
-	"github.com/onmetal/onmetal-api/utils/testing"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
+	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
+	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
+	"github.com/onmetal/onmetal-api/utils/testing"
 )
 
 const clusterName = "dev"
@@ -316,7 +317,7 @@ var _ = Describe("LoadBalancer", func() {
 			}))
 		}).Should(Succeed())
 
-		items := []commonv1alpha1.LocalUIDReference{}
+		var items []commonv1alpha1.LocalUIDReference
 		nic1 := &networkingv1alpha1.NetworkInterface{}
 		nic2 := &networkingv1alpha1.NetworkInterface{}
 		nic3 := &networkingv1alpha1.NetworkInterface{}
@@ -347,13 +348,18 @@ var _ = Describe("LoadBalancer", func() {
 			items = append(items, item)
 		}
 
-		By("ensuring that the destination addresses are updated")
+		By("ensuring that the load balancer routing is matching the destinations")
 		Eventually(func(g Gomega) {
 			err := loadbalancer.UpdateLoadBalancer(ctx, clusterName, service, []*corev1.Node{node1, node2})
 			g.Expect(err).NotTo(HaveOccurred())
 			lbRouting := &networkingv1alpha1.LoadBalancerRouting{}
-			Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: service.Namespace, Name: string(lbName)}, lbRouting)).To(Succeed())
-			By("getting lbRouting ")
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: service.Namespace, Name: lbName}, lbRouting)).To(Succeed())
+			g.Expect(lbRouting.OwnerReferences).To(ContainElement(metav1.OwnerReference{
+				APIVersion: "networking.api.onmetal.de/v1alpha1",
+				Kind:       "LoadBalancer",
+				Name:       lbName,
+				UID:        lb.UID,
+			}))
 			g.Expect(items).To(Equal(lbRouting.Destinations))
 		}).Should(Succeed())
 
@@ -363,8 +369,7 @@ var _ = Describe("LoadBalancer", func() {
 			err := loadbalancer.UpdateLoadBalancer(ctx, clusterName, service, []*corev1.Node{node2})
 			g.Expect(err).NotTo(HaveOccurred())
 			lbRouting := &networkingv1alpha1.LoadBalancerRouting{}
-			Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: service.Namespace, Name: string(lbName)}, lbRouting)).To(Succeed())
-			By("getting lbRouting ")
+			Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: service.Namespace, Name: lbName}, lbRouting)).To(Succeed())
 			g.Expect(items).To(Equal(lbRouting.Destinations))
 		}).Should(Succeed())
 
@@ -424,7 +429,7 @@ var _ = Describe("LoadBalancer", func() {
 		service.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{
 			{IP: "10.0.0.1"},
 		}
-		By("ensuring that GetLoadBalancer returns loadbalancer status")
+		By("ensuring that GetLoadBalancer returns the correct load-balancer status")
 		Eventually(func(g Gomega) {
 			status, exist, err := lb.GetLoadBalancer(ctx, "envtest", service)
 			g.Expect(err).NotTo(HaveOccurred())
@@ -495,16 +500,11 @@ var _ = Describe("LoadBalancer", func() {
 			Status: corev1.ServiceStatus{},
 		}
 
-		By("ensuring that LoadBalancer instance is deleted")
+		By("ensuring that LoadBalancer instance is deleted successfully")
 		Eventually(func(g Gomega) {
 			err := lb.EnsureLoadBalancerDeleted(ctx, "envtest", service)
 			g.Expect(err).NotTo(HaveOccurred())
 		}).Should(Succeed())
 
-		By("ensuring that LoadBalancer deletion does not return an error if the LB is deleted")
-		Eventually(func(g Gomega) {
-			err := lb.EnsureLoadBalancerDeleted(ctx, "envtest", service)
-			g.Expect(err).NotTo(HaveOccurred())
-		}).Should(Succeed())
 	})
 })

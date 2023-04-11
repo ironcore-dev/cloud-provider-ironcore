@@ -27,10 +27,11 @@ kind get kubeconfig > ./config/kind/kubeconfig
 ```
 Create cloud-config file under ./config/kind/ with the help of sample file present under ./config/sample/cloud-config 
 
-A make target that build and load the cloud controller into the kind cluster, then apply the config. Restarts cloud controller if they were present via
+Build and load the cloud controller into the kind cluster, then apply the config.
 
 ```shell
-make kind-deploy
+make docker-build
+kustomize build config/kind | kubectl apply -f -
 ```
 
 **Note**: In case that there are multiple environments running, ensure that `kind get clusters` is pointing to the
@@ -41,5 +42,5 @@ default kind cluster.
 To remove the cloud-controller from your cluster, simply run
 
 ```shell
-make kind-delete
+kustomize build config/kind | kubectl delete -f -
 ```

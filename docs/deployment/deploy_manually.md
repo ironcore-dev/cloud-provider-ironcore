@@ -48,7 +48,8 @@ kind get kubeconfig > ./config/kind/kubeconfig
 
 * Run below make target to deploy the ``cloud-provider-onmetal``
 ```shell
-make kind-deploy
+make docker-build
+kustomize build config/kind | kubectl apply -f -
 ```
 **Validation:**
 ```
@@ -64,5 +65,5 @@ default kind cluster.
 To remove the cloud-controller from your cluster, simply run
 
 ```shell
-make kind-delete
+kustomize build config/kind | kubectl delete -f -
 ```
