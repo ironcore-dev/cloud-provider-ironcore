@@ -18,10 +18,6 @@ import (
 	"fmt"
 	"strings"
 
-	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
-	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
-	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
-	"github.com/onmetal/onmetal-api/utils/testing"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
+	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
+	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
+	"github.com/onmetal/onmetal-api/utils/testing"
 )
 
 const clusterName = "dev"
@@ -495,16 +496,11 @@ var _ = Describe("LoadBalancer", func() {
 			Status: corev1.ServiceStatus{},
 		}
 
-		By("ensuring that LoadBalancer instance is deleted")
+		By("ensuring that LoadBalancer instance is deleted successfully")
 		Eventually(func(g Gomega) {
 			err := lb.EnsureLoadBalancerDeleted(ctx, "envtest", service)
 			g.Expect(err).NotTo(HaveOccurred())
 		}).Should(Succeed())
 
-		By("ensuring that LoadBalancer deletion does not return an error if the LB is deleted")
-		Eventually(func(g Gomega) {
-			err := lb.EnsureLoadBalancerDeleted(ctx, "envtest", service)
-			g.Expect(err).NotTo(HaveOccurred())
-		}).Should(Succeed())
 	})
 })

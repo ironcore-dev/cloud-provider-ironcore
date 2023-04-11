@@ -29,6 +29,7 @@ spec:
             - --authorization-kubeconfig=/etc/kubernetes/kubeconfig
             - --use-service-account-credentials
             - --leader-elect=true
+            - --requestheader-client-ca-file=/etc/config/ca
             - --secure-port=10245
             - --v=2
           image: controller:latest
@@ -60,6 +61,9 @@ spec:
             - mountPath: /etc/cloud
               name: cloud-config
               readOnly: true
+            - mountPath: /etc/config
+              name: kube-root-ca
+              readOnly: true
       volumes:
         - secret:
             secretName: cloud-config
@@ -73,6 +77,12 @@ spec:
         - secret:
             secretName: onmetalkubeconfig
           name: onmetalkubeconfig
+        - configMap:
+            name: kube-root-ca.crt
+            items:
+            - key: ca.crt
+              path: ca
+          name: kube-root-ca 
       tolerations:
         - key: node.cloudprovider.kubernetes.io/uninitialized
           value: "true"
