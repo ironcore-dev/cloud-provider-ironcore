@@ -43,6 +43,7 @@ import (
 	"k8s.io/controller-manager/pkg/clientbuilder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/yaml"
@@ -103,6 +104,7 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
+	SetClient(k8sClient)
 
 	apiSrv, err := apiserver.New(cfg, apiserver.Options{
 		MainPath:     "github.com/onmetal/onmetal-api/cmd/onmetal-apiserver",
@@ -121,9 +123,13 @@ var _ = BeforeSuite(func() {
 	Expect(envtestext.WaitUntilAPIServicesReadyWithTimeout(apiServiceTimeout, testEnvExt, k8sClient, scheme.Scheme)).To(Succeed())
 })
 
-func SetupTest(ctx context.Context) (*corev1.Namespace, string) {
-	ns := &corev1.Namespace{}
-	networkName := "my-network"
+func SetupTest(ctx context.Context) (*corev1.Namespace, *onmetalLoadBalancer, string) {
+
+	var (
+		ns          = &corev1.Namespace{}
+		olb         = &onmetalLoadBalancer{}
+		networkName = "my-network"
+	)
 
 	BeforeEach(func() {
 		*ns = corev1.Namespace{
@@ -194,7 +200,9 @@ func SetupTest(ctx context.Context) (*corev1.Namespace, string) {
 		cloudProvider, err = cloudprovider.InitCloudProvider(ProviderName, cloudConfigFile.Name())
 		Expect(err).NotTo(HaveOccurred())
 		cloudProvider.Initialize(clientBuilder, ctx.Done())
-	})
 
-	return ns, networkName
+		newLB := newOnmetalLoadBalancer(k8sClient, k8sClient, ns.Name, networkName)
+		*olb = *newLB.(*onmetalLoadBalancer)
+	})
+	return ns, olb, networkName
 }

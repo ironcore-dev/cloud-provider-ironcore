@@ -26,7 +26,7 @@ import (
 )
 
 var _ = Describe("Config", func() {
-	It("Should load a correct provider config", func() {
+	It("should load a correct provider config", func() {
 		sampleConfig := map[string]string{"networkName": "my-network"}
 		sampleConfigData, err := yaml.Marshal(sampleConfig)
 		Expect(err).NotTo(HaveOccurred())
@@ -72,7 +72,7 @@ var _ = Describe("Config", func() {
 		Expect(config.NetworkName).To(Equal("my-network"))
 	})
 
-	It("Should should get the default namespace if no namespace was defined for an auth context", func() {
+	It("should get the default namespace if no namespace was defined for an auth context", func() {
 		sampleConfig := map[string]string{"networkName": "my-network"}
 		sampleConfigData, err := yaml.Marshal(sampleConfig)
 		Expect(err).NotTo(HaveOccurred())
@@ -120,7 +120,7 @@ var _ = Describe("Config", func() {
 		Expect(config.NetworkName).To(Equal("my-network"))
 	})
 
-	It("Should fail on empty cloud provider config", func() {
+	It("should fail on empty cloud provider config", func() {
 		emptyConfig := map[string]string{"networkName": ""}
 		configData, err := yaml.Marshal(emptyConfig)
 		Expect(err).NotTo(HaveOccurred())

@@ -32,18 +32,9 @@ import (
 
 var _ = Describe("InstancesV2", func() {
 	ctx := testing.SetupContext()
-	ns, networkName := SetupTest(ctx)
+	ns, _, networkName := SetupTest(ctx)
 
-	It("Should get instance info", func() {
-		By("creating a network")
-		network := &networkingv1alpha1.Network{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
-				Name:      networkName,
-			},
-		}
-		Expect(k8sClient.Create(ctx, network)).To(Succeed())
-
+	It("should get instance info", func() {
 		By("creating a machine")
 		machine := &computev1alpha1.Machine{
 			ObjectMeta: metav1.ObjectMeta{
@@ -61,7 +52,7 @@ var _ = Describe("InstancesV2", func() {
 							Ephemeral: &computev1alpha1.EphemeralNetworkInterfaceSource{
 								NetworkInterfaceTemplate: &networkingv1alpha1.NetworkInterfaceTemplateSpec{
 									Spec: networkingv1alpha1.NetworkInterfaceSpec{
-										NetworkRef: corev1.LocalObjectReference{Name: network.Name},
+										NetworkRef: corev1.LocalObjectReference{Name: networkName},
 										IPs:        []networkingv1alpha1.IPSource{{Value: commonv1alpha1.MustParseNewIP("10.0.0.1")}},
 										VirtualIP: &networkingv1alpha1.VirtualIPSource{
 											Ephemeral: &networkingv1alpha1.EphemeralVirtualIPSource{
@@ -83,6 +74,7 @@ var _ = Describe("InstancesV2", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, ctx, machine)
 
 		By("patching the machine status to have a valid virtual IP and internal IP interface address")
 		machineBase := machine.DeepCopy()
@@ -102,6 +94,7 @@ var _ = Describe("InstancesV2", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, node)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, ctx, node)
 
 		By("getting the instances v2 interface")
 		instances, ok := cloudProvider.InstancesV2()
@@ -144,7 +137,7 @@ var _ = Describe("InstancesV2", func() {
 		}).Should(Succeed())
 	})
 
-	It("Should get InstanceNotFound if no Machine exists for Node", func() {
+	It("should get InstanceNotFound if no Machine exists for Node", func() {
 		By("creating a node object with a provider ID referencing non existing machine")
 		node := &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
@@ -166,7 +159,7 @@ var _ = Describe("InstancesV2", func() {
 		}).Should(Succeed())
 	})
 
-	It("Should fail to get instance metadata if no Machine exists for Node", func() {
+	It("should fail to get instance metadata if no Machine exists for Node", func() {
 		By("creating a node object with a provider ID referencing non existing machine")
 		node := &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
@@ -188,7 +181,7 @@ var _ = Describe("InstancesV2", func() {
 		}).Should(Succeed())
 	})
 
-	It("Should fail to get instance shutdown state if no Machine exists for Node", func() {
+	It("should fail to get instance shutdown state if no Machine exists for Node", func() {
 		By("creating a node object with a provider ID referencing non existing machine")
 		node := &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
