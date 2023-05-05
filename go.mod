@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/onmetal/controller-utils v0.7.0
 	github.com/onmetal/onmetal-api v0.1.1
-	github.com/onsi/ginkgo/v2 v2.9.3
+	github.com/onsi/ginkgo/v2 v2.9.4
 	github.com/onsi/gomega v1.27.6
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/pflag v1.0.5
