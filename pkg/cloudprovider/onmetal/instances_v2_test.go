@@ -18,16 +18,17 @@ import (
 	"fmt"
 	"net/netip"
 
-	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
-	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
-	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
-	"github.com/onmetal/onmetal-api/utils/testing"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cloudprovider "k8s.io/cloud-provider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
+	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
+	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
+	"github.com/onmetal/onmetal-api/utils/testing"
 )
 
 var _ = Describe("InstancesV2", func() {
@@ -101,40 +102,34 @@ var _ = Describe("InstancesV2", func() {
 		Expect(ok).To(BeTrue())
 
 		By("ensuring that an instance for a node exists")
-		Eventually(func(g Gomega) {
-			ok, err := instances.InstanceExists(ctx, node)
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(ok).To(BeTrue())
-		}).Should(Succeed())
+		ok, err := instances.InstanceExists(ctx, node)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ok).To(BeTrue())
 
 		By("ensuring that the instance is not shut down")
-		Eventually(func(g Gomega) {
-			ok, err := instances.InstanceShutdown(ctx, node)
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(ok).To(BeFalse())
-		}).Should(Succeed())
+		ok, err = instances.InstanceShutdown(ctx, node)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(ok).To(BeFalse())
 
 		By("ensuring that the instance meta data has the correct addresses")
-		Eventually(func(g Gomega) {
-			instanceMetadata, err := instances.InstanceMetadata(ctx, node)
-			g.Expect(err).NotTo(HaveOccurred())
-			g.Expect(instanceMetadata).To(Equal(&cloudprovider.InstanceMetadata{
-				ProviderID:   fmt.Sprintf("%s://%s/%s", ProviderName, machine.Namespace, machine.Name),
-				InstanceType: machine.Spec.MachineClassRef.Name,
-				NodeAddresses: []corev1.NodeAddress{
-					{
-						Type:    corev1.NodeExternalIP,
-						Address: "10.0.0.10",
-					},
-					{
-						Type:    corev1.NodeInternalIP,
-						Address: "10.0.0.1",
-					},
+		instanceMetadata, err := instances.InstanceMetadata(ctx, node)
+		Expect(err).NotTo(HaveOccurred())
+		Eventually(instanceMetadata).Should(SatisfyAll(
+			HaveField("ProviderID", getProviderID(ProviderName, machine.Namespace, machine.Name)),
+			HaveField("InstanceType", machine.Spec.MachineClassRef.Name),
+			HaveField("NodeAddresses", ContainElements(
+				corev1.NodeAddress{
+					Type:    corev1.NodeExternalIP,
+					Address: "10.0.0.10",
 				},
-				Zone:   "zone1",
-				Region: "",
-			}))
-		}).Should(Succeed())
+				corev1.NodeAddress{
+					Type:    corev1.NodeInternalIP,
+					Address: "10.0.0.1",
+				},
+			)),
+			HaveField("Zone", "zone1"),
+			HaveField("Region", "")))
+
 	})
 
 	It("should get InstanceNotFound if no Machine exists for Node", func() {
@@ -152,11 +147,9 @@ var _ = Describe("InstancesV2", func() {
 		Expect(ok).To(BeTrue())
 
 		By("ensuring that an instance for a node does not exist")
-		Eventually(func(g Gomega) {
-			ok, err := instances.InstanceExists(ctx, node)
-			g.Expect(err).To(Equal(cloudprovider.InstanceNotFound))
-			g.Expect(ok).To(BeFalse())
-		}).Should(Succeed())
+		ok, err := instances.InstanceExists(ctx, node)
+		Expect(err).To(Equal(cloudprovider.InstanceNotFound))
+		Expect(ok).To(BeFalse())
 	})
 
 	It("should fail to get instance metadata if no Machine exists for Node", func() {
@@ -174,11 +167,9 @@ var _ = Describe("InstancesV2", func() {
 		Expect(ok).To(BeTrue())
 
 		By("ensuring to fail getting the instance metadata")
-		Eventually(func(g Gomega) {
-			metaData, err := instances.InstanceMetadata(ctx, node)
-			g.Expect(err).To(Equal(cloudprovider.InstanceNotFound))
-			g.Expect(metaData).To(BeNil())
-		}).Should(Succeed())
+		metaData, err := instances.InstanceMetadata(ctx, node)
+		Expect(err).To(Equal(cloudprovider.InstanceNotFound))
+		Expect(metaData).To(BeNil())
 	})
 
 	It("should fail to get instance shutdown state if no Machine exists for Node", func() {
@@ -196,10 +187,13 @@ var _ = Describe("InstancesV2", func() {
 		Expect(ok).To(BeTrue())
 
 		By("ensuring to fail getting the instance metadata")
-		Eventually(func(g Gomega) {
-			ok, err := instances.InstanceShutdown(ctx, node)
-			g.Expect(err).To(Equal(cloudprovider.InstanceNotFound))
-			g.Expect(ok).To(BeFalse())
-		}).Should(Succeed())
+
+		ok, err := instances.InstanceShutdown(ctx, node)
+		Expect(err).To(Equal(cloudprovider.InstanceNotFound))
+		Expect(ok).To(BeFalse())
 	})
 })
+
+func getProviderID(providerName, namespace, machineName string) string {
+	return fmt.Sprintf("%s://%s/%s", ProviderName, namespace, machineName)
+}
