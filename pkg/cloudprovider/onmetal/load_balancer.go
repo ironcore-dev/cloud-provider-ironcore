@@ -49,15 +49,15 @@ type onmetalLoadBalancer struct {
 	targetClient     client.Client
 	onmetalClient    client.Client
 	onmetalNamespace string
-	networkName      string
+	cloudConfig      CloudConfig
 }
 
-func newOnmetalLoadBalancer(targetClient client.Client, onmetalClient client.Client, namespace string, networkName string) cloudprovider.LoadBalancer {
+func newOnmetalLoadBalancer(targetClient client.Client, onmetalClient client.Client, namespace string, cloudConfig CloudConfig) cloudprovider.LoadBalancer {
 	return &onmetalLoadBalancer{
 		targetClient:     targetClient,
 		onmetalClient:    onmetalClient,
 		onmetalNamespace: namespace,
-		networkName:      networkName,
+		cloudConfig:      cloudConfig,
 	}
 }
 
@@ -118,7 +118,7 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 			Type:       networkingv1alpha1.LoadBalancerTypePublic,
 			IPFamilies: service.Spec.IPFamilies,
 			NetworkRef: v1.LocalObjectReference{
-				Name: o.networkName,
+				Name: o.cloudConfig.NetworkName,
 			},
 			Ports: lbPorts,
 		},
@@ -191,7 +191,7 @@ func (o *onmetalLoadBalancer) applyLoadBalancerRoutingForLoadBalancer(ctx contex
 	network := &networkingv1alpha1.Network{}
 	networkKey := client.ObjectKey{Namespace: o.onmetalNamespace, Name: loadBalancer.Spec.NetworkRef.Name}
 	if err := o.onmetalClient.Get(ctx, networkKey, network); err != nil {
-		return fmt.Errorf("failed to get Network %s: %w", o.networkName, err)
+		return fmt.Errorf("failed to get Network %s: %w", o.cloudConfig.NetworkName, err)
 	}
 
 	loadBalancerRouting := &networkingv1alpha1.LoadBalancerRouting{
