@@ -15,6 +15,8 @@
 package onmetal
 
 const (
+	// InternalLoadBalancerAnnotation is internal load balancer annotation of service
+	InternalLoadBalancerAnnotation = "service.beta.kubernetes.io/onmetal-load-balancer-internal"
 	// AnnotationKeyClusterName is the cluster name annotation key name
 	AnnotationKeyClusterName = "cluster-name"
 	// AnnotationKeyServiceName is the service name annotation key name

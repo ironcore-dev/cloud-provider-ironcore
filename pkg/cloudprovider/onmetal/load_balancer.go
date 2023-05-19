@@ -20,18 +20,17 @@ import (
 	"strings"
 	"time"
 
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
-	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
+	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
+	"github.com/onmetal/onmetal-api/api/ipam/v1alpha1"
 	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
 )
 
@@ -122,6 +121,28 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 			},
 			Ports: lbPorts,
 		},
+	}
+
+	if value, ok := service.Annotations[InternalLoadBalancerAnnotation]; ok && value == "true" {
+		if o.cloudConfig.PrefixName == "" {
+			return nil, fmt.Errorf("prefixName is not provided in cloud-config. Please provide prefixName in onmetal cloud-config to create internal load balancer")
+		}
+		loadBalancer.Spec.Type = networkingv1alpha1.LoadBalancerTypeInternal
+		loadBalancer.Spec.IPs = []networkingv1alpha1.IPSource{
+			{
+				Ephemeral: &networkingv1alpha1.EphemeralPrefixSource{
+					PrefixTemplate: &v1alpha1.PrefixTemplateSpec{
+						Spec: v1alpha1.PrefixSpec{
+							// TODO: for now we only support IPv4 until Gardener has support for IPv6 based Shoots
+							IPFamily: v1.IPv4Protocol,
+							ParentRef: &v1.LocalObjectReference{
+								Name: o.cloudConfig.PrefixName,
+							},
+						},
+					},
+				},
+			},
+		}
 	}
 
 	klog.V(2).InfoS("Applying LoadBalancer for Service", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer), "Service", client.ObjectKeyFromObject(service))
