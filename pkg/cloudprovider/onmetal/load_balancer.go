@@ -125,7 +125,7 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 
 	if value, ok := service.Annotations[InternalLoadBalancerAnnotation]; ok && value == "true" {
 		if o.cloudConfig.PrefixName == "" {
-			return nil, fmt.Errorf("prefixName is not provided in cloud-config. Please provide prefixName in onmetal cloud-config to create internal load balancer")
+			return nil, fmt.Errorf("prefixName is not defined in config")
 		}
 		loadBalancer.Spec.Type = networkingv1alpha1.LoadBalancerTypeInternal
 		loadBalancer.Spec.IPs = []networkingv1alpha1.IPSource{
