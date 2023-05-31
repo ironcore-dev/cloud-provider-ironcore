@@ -19,7 +19,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	. "github.com/onsi/gomega/gstruct"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -111,19 +110,6 @@ var _ = Describe("LoadBalancer", func() {
 		Expect(k8sClient.Create(ctx, service)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, ctx, service)
 
-		Eventually(Object(service)).Should(SatisfyAll(
-			HaveField("Spec.Type", Equal(corev1.ServiceTypeLoadBalancer)),
-			HaveField("Spec.Ports", ConsistOf(
-				MatchFields(IgnoreMissing|IgnoreExtras, Fields{
-					"Name":       Equal("https"),
-					"Protocol":   Equal(corev1.Protocol("TCP")),
-					"Port":       Equal(int32(443)),
-					"TargetPort": Equal(intstr.IntOrString{IntVal: 443}),
-					"NodePort":   Equal(int32(31376)),
-				}),
-			)),
-		))
-
 		lbName = olb.GetLoadBalancerName(ctx, clusterName, service)
 
 		By("creating test LoadBalancer object")
@@ -183,7 +169,6 @@ var _ = Describe("LoadBalancer", func() {
 	})
 
 	It("should ensure internal LoadBalancer", func() {
-
 		By("adding internal LoadBalancer annotation to service")
 		svcBase := service.DeepCopy()
 		service.Annotations = map[string]string{

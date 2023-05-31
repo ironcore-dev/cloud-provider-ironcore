@@ -56,7 +56,7 @@ func init() {
 
 		onmetalCluster, err := cluster.New(cfg.RestConfig, func(o *cluster.Options) {
 			o.Scheme = onmetalScheme
-			o.Namespace = cfg.Namespace
+			o.Cache.Namespaces = []string{cfg.Namespace}
 		})
 		if err != nil {
 			return nil, fmt.Errorf("unable to create onmetal cluster: %w", err)
