@@ -20,17 +20,10 @@ import (
 	"testing"
 	"time"
 
-	corev1alpha1 "github.com/onmetal/onmetal-api/api/core/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"github.com/onmetal/controller-utils/buildutils"
-	"github.com/onmetal/controller-utils/modutils"
-	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
-	ipamv1alpha1 "github.com/onmetal/onmetal-api/api/ipam/v1alpha1"
-	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
-	storagev1alpha1 "github.com/onmetal/onmetal-api/api/storage/v1alpha1"
-	envtestext "github.com/onmetal/onmetal-api/utils/envtest"
-	"github.com/onmetal/onmetal-api/utils/envtest/apiserver"
+	corev1alpha1 "github.com/onmetal/onmetal-api/api/core/v1alpha1"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -47,6 +40,15 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/yaml"
+
+	"github.com/onmetal/controller-utils/buildutils"
+	"github.com/onmetal/controller-utils/modutils"
+	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
+	ipamv1alpha1 "github.com/onmetal/onmetal-api/api/ipam/v1alpha1"
+	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
+	storagev1alpha1 "github.com/onmetal/onmetal-api/api/storage/v1alpha1"
+	envtestext "github.com/onmetal/onmetal-api/utils/envtest"
+	"github.com/onmetal/onmetal-api/utils/envtest/apiserver"
 )
 
 var (
@@ -129,6 +131,7 @@ func SetupTest(ctx context.Context) (*corev1.Namespace, *onmetalLoadBalancer, st
 		ns          = &corev1.Namespace{}
 		olb         = &onmetalLoadBalancer{}
 		networkName = "my-network"
+		prefixName  = "my-prefix"
 	)
 
 	BeforeEach(func() {
@@ -185,7 +188,7 @@ func SetupTest(ctx context.Context) (*corev1.Namespace, *onmetalLoadBalancer, st
 		defer func() {
 			_ = cloudConfigFile.Close()
 		}()
-		cloudConfig := CloudConfig{NetworkName: networkName}
+		cloudConfig := CloudConfig{NetworkName: networkName, PrefixName: prefixName}
 		cloudConfigData, err := yaml.Marshal(&cloudConfig)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(os.WriteFile(cloudConfigFile.Name(), cloudConfigData, 0666)).To(Succeed())
@@ -201,7 +204,7 @@ func SetupTest(ctx context.Context) (*corev1.Namespace, *onmetalLoadBalancer, st
 		Expect(err).NotTo(HaveOccurred())
 		cloudProvider.Initialize(clientBuilder, ctx.Done())
 
-		newLB := newOnmetalLoadBalancer(k8sClient, k8sClient, ns.Name, networkName)
+		newLB := newOnmetalLoadBalancer(k8sClient, k8sClient, ns.Name, cloudConfig)
 		*olb = *newLB.(*onmetalLoadBalancer)
 	})
 	return ns, olb, networkName

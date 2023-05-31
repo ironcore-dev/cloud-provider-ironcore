@@ -20,18 +20,17 @@ import (
 	"strings"
 	"time"
 
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
-	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
+	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
+	"github.com/onmetal/onmetal-api/api/ipam/v1alpha1"
 	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
 )
 
@@ -49,15 +48,15 @@ type onmetalLoadBalancer struct {
 	targetClient     client.Client
 	onmetalClient    client.Client
 	onmetalNamespace string
-	networkName      string
+	cloudConfig      CloudConfig
 }
 
-func newOnmetalLoadBalancer(targetClient client.Client, onmetalClient client.Client, namespace string, networkName string) cloudprovider.LoadBalancer {
+func newOnmetalLoadBalancer(targetClient client.Client, onmetalClient client.Client, namespace string, cloudConfig CloudConfig) cloudprovider.LoadBalancer {
 	return &onmetalLoadBalancer{
 		targetClient:     targetClient,
 		onmetalClient:    onmetalClient,
 		onmetalNamespace: namespace,
-		networkName:      networkName,
+		cloudConfig:      cloudConfig,
 	}
 }
 
@@ -118,10 +117,32 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 			Type:       networkingv1alpha1.LoadBalancerTypePublic,
 			IPFamilies: service.Spec.IPFamilies,
 			NetworkRef: v1.LocalObjectReference{
-				Name: o.networkName,
+				Name: o.cloudConfig.NetworkName,
 			},
 			Ports: lbPorts,
 		},
+	}
+
+	if value, ok := service.Annotations[InternalLoadBalancerAnnotation]; ok && value == "true" {
+		if o.cloudConfig.PrefixName == "" {
+			return nil, fmt.Errorf("prefixName is not defined in config")
+		}
+		loadBalancer.Spec.Type = networkingv1alpha1.LoadBalancerTypeInternal
+		loadBalancer.Spec.IPs = []networkingv1alpha1.IPSource{
+			{
+				Ephemeral: &networkingv1alpha1.EphemeralPrefixSource{
+					PrefixTemplate: &v1alpha1.PrefixTemplateSpec{
+						Spec: v1alpha1.PrefixSpec{
+							// TODO: for now we only support IPv4 until Gardener has support for IPv6 based Shoots
+							IPFamily: v1.IPv4Protocol,
+							ParentRef: &v1.LocalObjectReference{
+								Name: o.cloudConfig.PrefixName,
+							},
+						},
+					},
+				},
+			},
+		}
 	}
 
 	klog.V(2).InfoS("Applying LoadBalancer for Service", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer), "Service", client.ObjectKeyFromObject(service))
@@ -191,7 +212,7 @@ func (o *onmetalLoadBalancer) applyLoadBalancerRoutingForLoadBalancer(ctx contex
 	network := &networkingv1alpha1.Network{}
 	networkKey := client.ObjectKey{Namespace: o.onmetalNamespace, Name: loadBalancer.Spec.NetworkRef.Name}
 	if err := o.onmetalClient.Get(ctx, networkKey, network); err != nil {
-		return fmt.Errorf("failed to get Network %s: %w", o.networkName, err)
+		return fmt.Errorf("failed to get Network %s: %w", o.cloudConfig.NetworkName, err)
 	}
 
 	loadBalancerRouting := &networkingv1alpha1.LoadBalancerRouting{

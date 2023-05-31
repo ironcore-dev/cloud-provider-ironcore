@@ -30,11 +30,12 @@ import (
 type cloudProviderConfig struct {
 	RestConfig  *rest.Config
 	Namespace   string
-	NetworkName string
+	cloudConfig CloudConfig
 }
 
 type CloudConfig struct {
 	NetworkName string `json:"networkName"`
+	PrefixName  string `json:"prefixName,omitempty"`
 }
 
 var (
@@ -92,6 +93,6 @@ func LoadCloudProviderConfig(f io.Reader) (*cloudProviderConfig, error) {
 	return &cloudProviderConfig{
 		RestConfig:  restConfig,
 		Namespace:   namespace,
-		NetworkName: cloudConfig.NetworkName,
+		cloudConfig: *cloudConfig,
 	}, nil
 }
