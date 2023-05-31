@@ -195,7 +195,7 @@ func waitLoadBalancerActive(ctx context.Context, clusterName string, service *v1
 		return false, err
 	})
 
-	if err == wait.ErrWaitTimeout {
+	if wait.Interrupted(err) {
 		err = fmt.Errorf("timeout waiting for the onmetal LoadBalancer %s to become ready", client.ObjectKeyFromObject(loadBalancer))
 	}
 
