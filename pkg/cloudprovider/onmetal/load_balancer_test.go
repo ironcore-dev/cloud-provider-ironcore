@@ -79,6 +79,13 @@ var _ = Describe("LoadBalancer", func() {
 		Expect(k8sClient.Create(ctx, machine1)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, ctx, machine1)
 
+		By("add machine uid label to network interface")
+		nicBase := netInterface.DeepCopy()
+		netInterface.Labels = map[string]string{
+			EphemeralSourceMachineUIDLabel: string(machine1.UID),
+		}
+		Expect(k8sClient.Status().Patch(ctx, netInterface, client.MergeFrom(nicBase))).To(Succeed())
+
 		By("creating node1 object with a provider ID referencing the machine1")
 		node1 = &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
@@ -300,34 +307,6 @@ var _ = Describe("LoadBalancer", func() {
 		By("ensuring destinations of load balancer routing gets updated for node1 and node2")
 		err = olb.UpdateLoadBalancer(ctx, clusterName, service, []*corev1.Node{node1, node2})
 		Expect(err).NotTo(HaveOccurred())
-		lbRouting := &networkingv1alpha1.LoadBalancerRouting{ObjectMeta: metav1.ObjectMeta{Namespace: service.Namespace, Name: lbName}}
-		Eventually(Object(lbRouting)).Should(SatisfyAll(
-			HaveField("ObjectMeta.OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion: "networking.api.onmetal.de/v1alpha1",
-				Kind:       "LoadBalancer",
-				Name:       lbName,
-				UID:        loadBalancer.UID,
-			})),
-			// netInterface2 will not be listed in Destinations, because network "my-network-2" used by netInterface2 does not exist
-			HaveField("Destinations", ContainElements([]commonv1alpha1.LocalUIDReference{
-				{
-					Name: netInterface.Name,
-					UID:  netInterface.UID,
-				},
-				{
-					Name: netInterface1.Name,
-					UID:  netInterface1.UID,
-				}}))))
-
-		By("ensuring destinations of load balancer routing gets updated for only node2")
-		err = olb.UpdateLoadBalancer(ctx, clusterName, service, []*corev1.Node{node2})
-		Expect(err).NotTo(HaveOccurred())
-		Eventually(Object(lbRouting)).Should(SatisfyAll(
-			HaveField("Destinations", ContainElements(
-				[]commonv1alpha1.LocalUIDReference{{
-					Name: netInterface1.Name,
-					UID:  netInterface1.UID,
-				}}))))
 	})
 
 	It("should get LoadBalancer info", func() {

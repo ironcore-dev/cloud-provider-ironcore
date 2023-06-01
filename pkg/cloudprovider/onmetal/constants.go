@@ -25,4 +25,6 @@ const (
 	AnnotationKeyServiceNamespace = "service-namespace"
 	// AnnotationKeyServiceUID is the service UID annotation key name
 	AnnotationKeyServiceUID = "service-uid"
+	// EphemeralSourceMachineUIDLabel is the machine UID label key name
+	EphemeralSourceMachineUIDLabel = "compute.api.onmetal.de/ephemeral-source-machine-uid"
 )

@@ -26,9 +26,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
 	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
 	"github.com/onmetal/onmetal-api/api/ipam/v1alpha1"
 	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
@@ -123,6 +121,22 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 		},
 	}
 
+	machineUIDs, err := o.getNetworkInterfaceSelector(ctx, nodes)
+	if err != nil {
+		return nil, err
+	}
+	loadBalancer.Spec.NetworkInterfaceSelector = &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      EphemeralSourceMachineUIDLabel,
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   machineUIDs,
+			},
+		},
+	}
+
+	fmt.Println("loadbalancer network interface selector: ", loadBalancer.Spec.NetworkInterfaceSelector)
+
 	if value, ok := service.Annotations[InternalLoadBalancerAnnotation]; ok && value == "true" {
 		if o.cloudConfig.PrefixName == "" {
 			return nil, fmt.Errorf("prefixName is not defined in config")
@@ -150,12 +164,6 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 		return nil, fmt.Errorf("failed to apply LoadBalancer %s for Service %s: %w", client.ObjectKeyFromObject(loadBalancer), client.ObjectKeyFromObject(service), err)
 	}
 	klog.V(2).InfoS("Applied LoadBalancer for Service", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer), "Service", client.ObjectKeyFromObject(service))
-
-	klog.V(2).InfoS("Applying LoadBalancerRouting for LoadBalancer", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
-	if err := o.applyLoadBalancerRoutingForLoadBalancer(ctx, loadBalancer, nodes); err != nil {
-		return nil, err
-	}
-	klog.V(2).InfoS("Applied LoadBalancerRouting for LoadBalancer", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
 
 	lbIPs := loadBalancer.Status.IPs
 	if len(lbIPs) == 0 {
@@ -203,67 +211,17 @@ func waitLoadBalancerActive(ctx context.Context, clusterName string, service *v1
 	return err
 }
 
-func (o *onmetalLoadBalancer) applyLoadBalancerRoutingForLoadBalancer(ctx context.Context, loadBalancer *networkingv1alpha1.LoadBalancer, nodes []*v1.Node) error {
-	networkInterfaces, err := o.getNetworkInterfacesForNodes(ctx, nodes, loadBalancer.Spec.NetworkRef.Name)
-	if err != nil {
-		return fmt.Errorf("failed to get NetworkInterfaces for Nodes: %w", err)
-	}
-
-	network := &networkingv1alpha1.Network{}
-	networkKey := client.ObjectKey{Namespace: o.onmetalNamespace, Name: loadBalancer.Spec.NetworkRef.Name}
-	if err := o.onmetalClient.Get(ctx, networkKey, network); err != nil {
-		return fmt.Errorf("failed to get Network %s: %w", o.cloudConfig.NetworkName, err)
-	}
-
-	loadBalancerRouting := &networkingv1alpha1.LoadBalancerRouting{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "LoadBalancerRouting",
-			APIVersion: networkingv1alpha1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      loadBalancer.Name,
-			Namespace: o.onmetalNamespace,
-		},
-		NetworkRef: commonv1alpha1.LocalUIDReference{
-			Name: network.Name,
-			UID:  network.UID,
-		},
-		Destinations: networkInterfaces,
-	}
-
-	if err := controllerutil.SetOwnerReference(loadBalancer, loadBalancerRouting, o.onmetalClient.Scheme()); err != nil {
-		return fmt.Errorf("failed to set owner reference for load balancer routing %s: %w", client.ObjectKeyFromObject(loadBalancerRouting), err)
-	}
-
-	if err := o.onmetalClient.Patch(ctx, loadBalancerRouting, client.Apply, loadBalancerFieldOwner, client.ForceOwnership); err != nil {
-		return fmt.Errorf("failed to apply LoadBalancerRouting %s for LoadBalancer %s: %w", client.ObjectKeyFromObject(loadBalancerRouting), client.ObjectKeyFromObject(loadBalancer), err)
-	}
-	return nil
-}
-
-func (o *onmetalLoadBalancer) getNetworkInterfacesForNodes(ctx context.Context, nodes []*v1.Node, networkName string) ([]commonv1alpha1.LocalUIDReference, error) {
-	var networkInterfaces []commonv1alpha1.LocalUIDReference
+func (o *onmetalLoadBalancer) getNetworkInterfaceSelector(ctx context.Context, nodes []*v1.Node) ([]string, error) {
+	var machineUIDs []string
 	for _, node := range nodes {
 		machine := &computev1alpha1.Machine{}
 		if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: node.Name}, machine); client.IgnoreNotFound(err) != nil {
 			return nil, fmt.Errorf("failed to get machine object for node %s: %w", node.Name, err)
 		}
 
-		for _, machineNIC := range machine.Spec.NetworkInterfaces {
-			networkInterface := &networkingv1alpha1.NetworkInterface{}
-			networkInterfaceName := fmt.Sprintf("%s-%s", machine.Name, machineNIC.Name)
-			if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: networkInterfaceName}, networkInterface); err != nil {
-				return nil, fmt.Errorf("failed to get network interface %s for machine %s: %w", client.ObjectKeyFromObject(networkInterface), client.ObjectKeyFromObject(machine), err)
-			}
-			if networkInterface.Spec.NetworkRef.Name == networkName {
-				networkInterfaces = append(networkInterfaces, commonv1alpha1.LocalUIDReference{
-					Name: networkInterface.Name,
-					UID:  networkInterface.UID,
-				})
-			}
-		}
+		machineUIDs = append(machineUIDs, string(machine.UID))
 	}
-	return networkInterfaces, nil
+	return machineUIDs, nil
 }
 
 func (o *onmetalLoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
@@ -279,22 +237,23 @@ func (o *onmetalLoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterNam
 		return fmt.Errorf("failed to get LoadBalancer %s: %w", client.ObjectKeyFromObject(loadBalancer), err)
 	}
 
-	loadBalancerRouting := &networkingv1alpha1.LoadBalancerRouting{}
-	loadBalancerRoutingKey := client.ObjectKey{Namespace: o.onmetalNamespace, Name: loadBalancerName}
-	if err := o.onmetalClient.Get(ctx, loadBalancerRoutingKey, loadBalancerRouting); err != nil {
-		return fmt.Errorf("failed to get LoadBalancerRouting %s for LoadBalancer %s: %w", client.ObjectKeyFromObject(loadBalancer), client.ObjectKeyFromObject(loadBalancerRouting), err)
-	}
-
-	klog.V(2).InfoS("Updating LoadBalancerRouting destinations for LoadBalancer", "LoadBalancerRouting", client.ObjectKeyFromObject(loadBalancerRouting), "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
-	networkInterfaces, err := o.getNetworkInterfacesForNodes(ctx, nodes, loadBalancer.Spec.NetworkRef.Name)
+	loadBalancerBase := loadBalancer.DeepCopy()
+	machineUIDs, err := o.getNetworkInterfaceSelector(ctx, nodes)
 	if err != nil {
-		return fmt.Errorf("failed to get NetworkInterfaces for LoadBalancer %s: %w", client.ObjectKeyFromObject(loadBalancer), err)
+		return err
 	}
-	loadBalancerRoutingBase := loadBalancerRouting.DeepCopy()
-	loadBalancerRouting.Destinations = networkInterfaces
+	loadBalancer.Spec.NetworkInterfaceSelector = &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      EphemeralSourceMachineUIDLabel,
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   machineUIDs,
+			},
+		},
+	}
 
-	if err := o.onmetalClient.Patch(ctx, loadBalancerRouting, client.MergeFrom(loadBalancerRoutingBase)); err != nil {
-		return fmt.Errorf("failed to patch LoadBalancerRouting %s for LoadBalancer %s: %w", client.ObjectKeyFromObject(loadBalancerRouting), client.ObjectKeyFromObject(loadBalancer), err)
+	if err := o.onmetalClient.Patch(ctx, loadBalancer, client.MergeFrom(loadBalancerBase)); err != nil {
+		return fmt.Errorf("failed to patch LoadBalancer %s: %w", client.ObjectKeyFromObject(loadBalancer), err)
 	}
 
 	klog.V(2).InfoS("Updated LoadBalancer for Service", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer), "Service", client.ObjectKeyFromObject(service))
