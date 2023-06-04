@@ -84,10 +84,6 @@ func (o *onmetalLoadBalancer) GetLoadBalancerName(ctx context.Context, clusterNa
 func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	klog.V(2).InfoS("EnsureLoadBalancer for Service", "Cluster", clusterName, "Service", client.ObjectKeyFromObject(service))
 
-	if len(nodes) == 0 {
-		return nil, fmt.Errorf("there are no available nodes for LoadBalancer service %s", client.ObjectKeyFromObject(service))
-	}
-
 	loadBalancerName := getLoadBalancerNameForService(clusterName, service)
 	klog.V(2).InfoS("Getting LoadBalancer ports from Service", "Service", client.ObjectKeyFromObject(service))
 	lbPorts := []networkingv1alpha1.LoadBalancerPort{}
