@@ -15,14 +15,12 @@
 package onmetal
 
 import (
-	"github.com/onmetal/onmetal-api/utils/testing"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Cloud", func() {
-	ctx := testing.SetupContext()
-	SetupTest(ctx)
+	SetupTest()
 
 	It("should ensure the correct cloud provider setup", func() {
 		Expect(cloudProvider.HasClusterID()).To(BeTrue())

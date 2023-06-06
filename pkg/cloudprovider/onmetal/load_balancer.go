@@ -20,6 +20,8 @@ import (
 	"strings"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -78,6 +80,7 @@ func (o *onmetalLoadBalancer) GetLoadBalancer(ctx context.Context, clusterName s
 }
 
 func (o *onmetalLoadBalancer) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
+	cloudprovider.DefaultLoadBalancerName(service)
 	return getLoadBalancerNameForService(clusterName, service)
 }
 
@@ -86,7 +89,7 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 
 	loadBalancerName := getLoadBalancerNameForService(clusterName, service)
 	klog.V(2).InfoS("Getting LoadBalancer ports from Service", "Service", client.ObjectKeyFromObject(service))
-	lbPorts := []networkingv1alpha1.LoadBalancerPort{}
+	var lbPorts []networkingv1alpha1.LoadBalancerPort
 	for _, svcPort := range service.Spec.Ports {
 		lbPorts = append(lbPorts, networkingv1alpha1.LoadBalancerPort{
 			Protocol: &svcPort.Protocol,
@@ -240,8 +243,9 @@ func (o *onmetalLoadBalancer) applyLoadBalancerRoutingForLoadBalancer(ctx contex
 func (o *onmetalLoadBalancer) getNetworkInterfacesForNodes(ctx context.Context, nodes []*v1.Node, networkName string) ([]commonv1alpha1.LocalUIDReference, error) {
 	var networkInterfaces []commonv1alpha1.LocalUIDReference
 	for _, node := range nodes {
+		machineName := extractMachineNameFromProviderID(node.Spec.ProviderID)
 		machine := &computev1alpha1.Machine{}
-		if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: node.Name}, machine); client.IgnoreNotFound(err) != nil {
+		if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: machineName}, machine); client.IgnoreNotFound(err) != nil {
 			return nil, fmt.Errorf("failed to get machine object for node %s: %w", node.Name, err)
 		}
 
@@ -260,6 +264,14 @@ func (o *onmetalLoadBalancer) getNetworkInterfacesForNodes(ctx context.Context, 
 		}
 	}
 	return networkInterfaces, nil
+}
+
+func extractMachineNameFromProviderID(providerID string) string {
+	lastSlash := strings.LastIndex(providerID, "/")
+	if lastSlash == -1 || lastSlash+1 >= len(providerID) {
+		return ""
+	}
+	return providerID[lastSlash+1:]
 }
 
 func (o *onmetalLoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
@@ -306,7 +318,11 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clu
 		},
 	}
 	klog.V(2).InfoS("Deleting LoadBalancer", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
-	if err := o.onmetalClient.Delete(ctx, loadBalancer); client.IgnoreNotFound(err) != nil {
+	if err := o.onmetalClient.Delete(ctx, loadBalancer); err != nil {
+		if apierrors.IsNotFound(err) {
+			klog.V(2).InfoS("LoadBalancer is already gone", client.ObjectKeyFromObject(loadBalancer))
+			return nil
+		}
 		return fmt.Errorf("failed to delete loadbalancer %s: %w", client.ObjectKeyFromObject(loadBalancer), err)
 	}
 	klog.V(2).InfoS("Deleted LoadBalancer", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))

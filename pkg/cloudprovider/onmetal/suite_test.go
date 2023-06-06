@@ -20,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	corev1alpha1 "github.com/onmetal/onmetal-api/api/core/v1alpha1"
@@ -125,21 +127,19 @@ var _ = BeforeSuite(func() {
 	Expect(envtestext.WaitUntilAPIServicesReadyWithTimeout(apiServiceTimeout, testEnvExt, k8sClient, scheme.Scheme)).To(Succeed())
 })
 
-func SetupTest(ctx context.Context) (*corev1.Namespace, *onmetalLoadBalancer, string) {
-
+func SetupTest() (*corev1.Namespace, *onmetalLoadBalancer, *networkingv1alpha1.Network) {
 	var (
-		ns          = &corev1.Namespace{}
-		olb         = &onmetalLoadBalancer{}
-		networkName = "my-network"
-		prefixName  = "my-prefix"
+		ns      = &corev1.Namespace{}
+		olb     = &onmetalLoadBalancer{}
+		network = &networkingv1alpha1.Network{}
 	)
 
-	BeforeEach(func() {
+	BeforeEach(func(ctx SpecContext) {
 		*ns = corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{GenerateName: "testns-"},
 		}
 		Expect(k8sClient.Create(ctx, ns)).NotTo(HaveOccurred(), "failed to create test namespace")
-		DeferCleanup(k8sClient.Delete, ctx, ns)
+		DeferCleanup(k8sClient.Delete, ns)
 
 		By("creating a machine class")
 		machineClass := &computev1alpha1.MachineClass{
@@ -152,7 +152,30 @@ func SetupTest(ctx context.Context) (*corev1.Namespace, *onmetalLoadBalancer, st
 			},
 		}
 		Expect(k8sClient.Create(ctx, machineClass)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, ctx, machineClass)
+		DeferCleanup(k8sClient.Delete, machineClass)
+
+		By("creating network")
+		*network = networkingv1alpha1.Network{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "network-",
+			},
+		}
+		Expect(k8sClient.Create(ctx, network)).To(Succeed())
+
+		By("creating prefix")
+		prefix := &ipamv1alpha1.Prefix{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "prefix-",
+				Namespace:    ns.Name,
+			},
+			Spec: ipamv1alpha1.PrefixSpec{
+				IPFamily: corev1.IPv4Protocol,
+				Prefix:   commonv1alpha1.MustParseNewIPPrefix("100.0.0.0/24"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, prefix)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, prefix)
 
 		user, err := testEnv.AddUser(envtest.User{
 			Name:   "dummy",
@@ -188,12 +211,12 @@ func SetupTest(ctx context.Context) (*corev1.Namespace, *onmetalLoadBalancer, st
 		defer func() {
 			_ = cloudConfigFile.Close()
 		}()
-		cloudConfig := CloudConfig{NetworkName: networkName, PrefixName: prefixName}
+		cloudConfig := CloudConfig{NetworkName: network.Name, PrefixName: prefix.Name}
 		cloudConfigData, err := yaml.Marshal(&cloudConfig)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(os.WriteFile(cloudConfigFile.Name(), cloudConfigData, 0666)).To(Succeed())
 
-		ctx, cancel := context.WithCancel(context.Background())
+		cloudProviderCtx, cancel := context.WithCancel(context.Background())
 		DeferCleanup(cancel)
 
 		k8sClientSet, err := kubernetes.NewForConfig(cfg)
@@ -202,10 +225,10 @@ func SetupTest(ctx context.Context) (*corev1.Namespace, *onmetalLoadBalancer, st
 		clientBuilder := clientbuilder.NewDynamicClientBuilder(testEnv.Config, k8sClientSet.CoreV1(), "default")
 		cloudProvider, err = cloudprovider.InitCloudProvider(ProviderName, cloudConfigFile.Name())
 		Expect(err).NotTo(HaveOccurred())
-		cloudProvider.Initialize(clientBuilder, ctx.Done())
+		cloudProvider.Initialize(clientBuilder, cloudProviderCtx.Done())
 
 		newLB := newOnmetalLoadBalancer(k8sClient, k8sClient, ns.Name, cloudConfig)
 		*olb = *newLB.(*onmetalLoadBalancer)
 	})
-	return ns, olb, networkName
+	return ns, olb, network
 }
