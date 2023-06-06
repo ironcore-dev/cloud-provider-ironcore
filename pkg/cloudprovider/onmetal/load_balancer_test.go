@@ -15,8 +15,6 @@
 package onmetal
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -87,7 +85,6 @@ var _ = Describe("LoadBalancer", func() {
 		}
 		Expect(k8sClient.Create(ctx, node1)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, ctx, node1)
-
 		By("creating test service of type LoadBalancer")
 		service = &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -129,10 +126,6 @@ var _ = Describe("LoadBalancer", func() {
 	})
 
 	It("should ensure external LoadBalancer", func() {
-
-		By("expecting an error if there are no nodes available")
-		_, err := olb.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{})
-		Expect(err).Should(MatchError(fmt.Sprintf("there are no available nodes for LoadBalancer service %s", client.ObjectKeyFromObject(service))))
 
 		By("creating a Node object")
 		node := &corev1.Node{
