@@ -28,14 +28,12 @@ import (
 	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
 	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
 	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
-	"github.com/onmetal/onmetal-api/utils/testing"
 )
 
 var _ = Describe("InstancesV2", func() {
-	ctx := testing.SetupContext()
-	ns, _, networkName := SetupTest(ctx)
+	ns, _, network := SetupTest()
 
-	It("should get instance info", func() {
+	It("should get instance info", func(ctx SpecContext) {
 		By("creating a machine")
 		machine := &computev1alpha1.Machine{
 			ObjectMeta: metav1.ObjectMeta{
@@ -53,7 +51,7 @@ var _ = Describe("InstancesV2", func() {
 							Ephemeral: &computev1alpha1.EphemeralNetworkInterfaceSource{
 								NetworkInterfaceTemplate: &networkingv1alpha1.NetworkInterfaceTemplateSpec{
 									Spec: networkingv1alpha1.NetworkInterfaceSpec{
-										NetworkRef: corev1.LocalObjectReference{Name: networkName},
+										NetworkRef: corev1.LocalObjectReference{Name: network.Name},
 										IPs:        []networkingv1alpha1.IPSource{{Value: commonv1alpha1.MustParseNewIP("10.0.0.1")}},
 										VirtualIP: &networkingv1alpha1.VirtualIPSource{
 											Ephemeral: &networkingv1alpha1.EphemeralVirtualIPSource{
@@ -75,7 +73,6 @@ var _ = Describe("InstancesV2", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, ctx, machine)
 
 		By("patching the machine status to have a valid virtual IP and internal IP interface address")
 		machineBase := machine.DeepCopy()
@@ -95,7 +92,7 @@ var _ = Describe("InstancesV2", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, node)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, ctx, node)
+		DeferCleanup(k8sClient.Delete, node)
 
 		By("getting the instances v2 interface")
 		instances, ok := cloudProvider.InstancesV2()
@@ -115,7 +112,7 @@ var _ = Describe("InstancesV2", func() {
 		instanceMetadata, err := instances.InstanceMetadata(ctx, node)
 		Expect(err).NotTo(HaveOccurred())
 		Eventually(instanceMetadata).Should(SatisfyAll(
-			HaveField("ProviderID", getProviderID(ProviderName, machine.Namespace, machine.Name)),
+			HaveField("ProviderID", getProviderID(machine.Namespace, machine.Name)),
 			HaveField("InstanceType", machine.Spec.MachineClassRef.Name),
 			HaveField("NodeAddresses", ContainElements(
 				corev1.NodeAddress{
@@ -132,7 +129,7 @@ var _ = Describe("InstancesV2", func() {
 
 	})
 
-	It("should get InstanceNotFound if no Machine exists for Node", func() {
+	It("should get InstanceNotFound if no Machine exists for Node", func(ctx SpecContext) {
 		By("creating a node object with a provider ID referencing non existing machine")
 		node := &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
@@ -140,7 +137,7 @@ var _ = Describe("InstancesV2", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, node)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, ctx, node)
+		DeferCleanup(k8sClient.Delete, node)
 
 		By("getting the instances v2 interface")
 		instances, ok := cloudProvider.InstancesV2()
@@ -152,7 +149,7 @@ var _ = Describe("InstancesV2", func() {
 		Expect(ok).To(BeFalse())
 	})
 
-	It("should fail to get instance metadata if no Machine exists for Node", func() {
+	It("should fail to get instance metadata if no Machine exists for Node", func(ctx SpecContext) {
 		By("creating a node object with a provider ID referencing non existing machine")
 		node := &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
@@ -160,7 +157,7 @@ var _ = Describe("InstancesV2", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, node)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, ctx, node)
+		DeferCleanup(k8sClient.Delete, node)
 
 		By("getting the instances v2 interface")
 		instances, ok := cloudProvider.InstancesV2()
@@ -172,7 +169,7 @@ var _ = Describe("InstancesV2", func() {
 		Expect(metaData).To(BeNil())
 	})
 
-	It("should fail to get instance shutdown state if no Machine exists for Node", func() {
+	It("should fail to get instance shutdown state if no Machine exists for Node", func(ctx SpecContext) {
 		By("creating a node object with a provider ID referencing non existing machine")
 		node := &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{
@@ -180,7 +177,7 @@ var _ = Describe("InstancesV2", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, node)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, ctx, node)
+		DeferCleanup(k8sClient.Delete, node)
 
 		By("getting the instances v2 interface")
 		instances, ok := cloudProvider.InstancesV2()
@@ -194,6 +191,6 @@ var _ = Describe("InstancesV2", func() {
 	})
 })
 
-func getProviderID(providerName, namespace, machineName string) string {
+func getProviderID(namespace, machineName string) string {
 	return fmt.Sprintf("%s://%s/%s", ProviderName, namespace, machineName)
 }
