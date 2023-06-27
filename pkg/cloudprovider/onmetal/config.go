@@ -34,8 +34,9 @@ type cloudProviderConfig struct {
 }
 
 type CloudConfig struct {
-	NetworkName string `json:"networkName"`
-	PrefixName  string `json:"prefixName,omitempty"`
+	NetworkName   string `json:"networkName"`
+	PrefixName    string `json:"prefixName,omitempty"`
+	DisableRoutes bool   `json:"disableRoutes,omitempty"`
 }
 
 var (
