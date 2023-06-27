@@ -100,10 +100,7 @@ func (o *cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, 
 
 	o.instancesV2 = newOnmetalInstancesV2(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace)
 	o.loadBalancer = newOnmetalLoadBalancer(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace, o.cloudConfig)
-
-	if !o.cloudConfig.DisableRoutes {
-		o.routes = newOnmetalRoutes(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace, o.cloudConfig)
-	}
+	o.routes = newOnmetalRoutes(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace, o.cloudConfig)
 
 	if err := o.onmetalCluster.GetFieldIndexer().IndexField(ctx, &computev1alpha1.Machine{}, machineMetadataUIDField, func(object client.Object) []string {
 		machine := object.(*computev1alpha1.Machine)
