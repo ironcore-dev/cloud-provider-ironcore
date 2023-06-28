@@ -36,8 +36,9 @@ import (
 )
 
 const (
-	ProviderName            = "onmetal"
-	machineMetadataUIDField = ".metadata.uid"
+	ProviderName                            = "onmetal"
+	machineMetadataUIDField                 = ".metadata.uid"
+	networkInterfaceSpecNetworkRefNameField = "spec.networkRef.name"
 )
 
 var onmetalScheme = runtime.NewScheme()
@@ -77,6 +78,7 @@ type cloud struct {
 	cloudConfig      CloudConfig
 	loadBalancer     cloudprovider.LoadBalancer
 	instancesV2      cloudprovider.InstancesV2
+	routes           cloudprovider.Routes
 }
 
 func (o *cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
@@ -98,12 +100,20 @@ func (o *cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, 
 
 	o.instancesV2 = newOnmetalInstancesV2(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace)
 	o.loadBalancer = newOnmetalLoadBalancer(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace, o.cloudConfig)
+	o.routes = newOnmetalRoutes(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace, o.cloudConfig)
 
 	if err := o.onmetalCluster.GetFieldIndexer().IndexField(ctx, &computev1alpha1.Machine{}, machineMetadataUIDField, func(object client.Object) []string {
 		machine := object.(*computev1alpha1.Machine)
 		return []string{string(machine.UID)}
 	}); err != nil {
-		log.Fatalf("Failed to setup field indexer: %v", err)
+		log.Fatalf("Failed to setup field indexer for machine: %v", err)
+	}
+
+	if err := o.onmetalCluster.GetFieldIndexer().IndexField(ctx, &networkingv1alpha1.NetworkInterface{}, networkInterfaceSpecNetworkRefNameField, func(object client.Object) []string {
+		nic := object.(*networkingv1alpha1.NetworkInterface)
+		return []string{nic.Spec.NetworkRef.Name}
+	}); err != nil {
+		log.Fatalf("Failed to setup field indexe for network interfacer: %v", err)
 	}
 
 	if _, err := o.targetCluster.GetCache().GetInformer(ctx, &corev1.Node{}); err != nil {
@@ -161,7 +171,7 @@ func (o *cloud) Clusters() (cloudprovider.Clusters, bool) {
 
 // Routes returns an implementation of Routes for onmetal
 func (o *cloud) Routes() (cloudprovider.Routes, bool) {
-	return nil, false
+	return o.routes, true
 }
 
 // ProviderName returns the cloud provider ID
