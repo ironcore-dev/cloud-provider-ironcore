@@ -38,9 +38,5 @@ var _ = Describe("Cloud", func() {
 		zones, ok := cloudProvider.Zones()
 		Expect(zones).To(BeNil())
 		Expect(ok).To(BeFalse())
-
-		routes, ok := cloudProvider.Routes()
-		Expect(routes).To(BeNil())
-		Expect(ok).To(BeFalse())
 	})
 })
