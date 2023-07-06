@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cloudprovider "k8s.io/cloud-provider"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
 	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
@@ -37,8 +38,8 @@ var _ = Describe("InstancesV2", func() {
 		By("creating a machine")
 		machine := &computev1alpha1.Machine{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "machine-",
+				Namespace: ns.Name,
+				Name:      "machine1",
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
@@ -48,23 +49,8 @@ var _ = Describe("InstancesV2", func() {
 					{
 						Name: "my-nic",
 						NetworkInterfaceSource: computev1alpha1.NetworkInterfaceSource{
-							Ephemeral: &computev1alpha1.EphemeralNetworkInterfaceSource{
-								NetworkInterfaceTemplate: &networkingv1alpha1.NetworkInterfaceTemplateSpec{
-									Spec: networkingv1alpha1.NetworkInterfaceSpec{
-										NetworkRef: corev1.LocalObjectReference{Name: network.Name},
-										IPs:        []networkingv1alpha1.IPSource{{Value: commonv1alpha1.MustParseNewIP("10.0.0.1")}},
-										VirtualIP: &networkingv1alpha1.VirtualIPSource{
-											Ephemeral: &networkingv1alpha1.EphemeralVirtualIPSource{
-												VirtualIPTemplate: &networkingv1alpha1.VirtualIPTemplateSpec{
-													Spec: networkingv1alpha1.VirtualIPSpec{
-														Type:     networkingv1alpha1.VirtualIPTypePublic,
-														IPFamily: corev1.IPv4Protocol,
-													},
-												},
-											},
-										},
-									},
-								},
+							NetworkInterfaceRef: &corev1.LocalObjectReference{
+								Name: "machine1-my-nic",
 							},
 						},
 					},
@@ -73,6 +59,30 @@ var _ = Describe("InstancesV2", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+
+		By("creating a network interface for machine")
+		netInterface := &networkingv1alpha1.NetworkInterface{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "machine1-my-nic",
+				Namespace: ns.Name,
+			},
+			Spec: networkingv1alpha1.NetworkInterfaceSpec{
+				NetworkRef: corev1.LocalObjectReference{Name: network.Name},
+				IPs:        []networkingv1alpha1.IPSource{{Value: commonv1alpha1.MustParseNewIP("10.0.0.1")}},
+				VirtualIP: &networkingv1alpha1.VirtualIPSource{
+					Ephemeral: &networkingv1alpha1.EphemeralVirtualIPSource{
+						VirtualIPTemplate: &networkingv1alpha1.VirtualIPTemplateSpec{
+							Spec: networkingv1alpha1.VirtualIPSpec{
+								Type:     networkingv1alpha1.VirtualIPTypePublic,
+								IPFamily: corev1.IPv4Protocol,
+							},
+						},
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, netInterface)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, netInterface)
 
 		By("patching the machine status to have a valid virtual IP and internal IP interface address")
 		machineBase := machine.DeepCopy()
@@ -126,6 +136,16 @@ var _ = Describe("InstancesV2", func() {
 			)),
 			HaveField("Zone", "zone1"),
 			HaveField("Region", "")))
+
+		By("ensuring cluster name label is added to Machine object")
+		Eventually(Object(machine)).Should(SatisfyAll(
+			HaveField("Labels", map[string]string{LabelClusterNameKey: "test"}),
+		))
+
+		By("ensuring cluster name label is added to network interface of Machine object")
+		Eventually(Object(netInterface)).Should(SatisfyAll(
+			HaveField("Labels", map[string]string{LabelClusterNameKey: "test"}),
+		))
 
 	})
 

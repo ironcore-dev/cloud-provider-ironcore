@@ -98,7 +98,7 @@ func (o *cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, 
 		log.Fatalf("Failed to create new cluster: %v", err)
 	}
 
-	o.instancesV2 = newOnmetalInstancesV2(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace)
+	o.instancesV2 = newOnmetalInstancesV2(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace, o.cloudConfig.ClusterName)
 	o.loadBalancer = newOnmetalLoadBalancer(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace, o.cloudConfig)
 	o.routes = newOnmetalRoutes(o.targetCluster.GetClient(), o.onmetalCluster.GetClient(), o.onmetalNamespace, o.cloudConfig)
 
@@ -113,7 +113,7 @@ func (o *cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, 
 		nic := object.(*networkingv1alpha1.NetworkInterface)
 		return []string{nic.Spec.NetworkRef.Name}
 	}); err != nil {
-		log.Fatalf("Failed to setup field indexe for network interfacer: %v", err)
+		log.Fatalf("Failed to setup field indexer for network interface: %v", err)
 	}
 
 	if _, err := o.targetCluster.GetCache().GetInformer(ctx, &corev1.Node{}); err != nil {

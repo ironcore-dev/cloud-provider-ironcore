@@ -55,11 +55,13 @@ var _ = Describe("Routes", func() {
 			},
 		}
 		machine := newMachine(ns.Name, "machine", networkInterfaces)
+		machine.Labels = map[string]string{LabelClusterNameKey: "test"}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, machine)
 
 		By("creating a network interface for machine")
 		netInterface = newNetworkInterface(ns.Name, "machine-networkinterface", network.Name, "10.0.0.5")
+		netInterface.Labels = map[string]string{LabelClusterNameKey: "test"}
 		netInterface.Spec.MachineRef = &commonv1alpha1.LocalUIDReference{
 			Name: machine.Name,
 			UID:  machine.UID,
@@ -71,6 +73,20 @@ var _ = Describe("Routes", func() {
 		}
 		Expect(k8sClient.Create(ctx, netInterface)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, netInterface)
+
+		By("creating a network interface2 for machine without cluster name label")
+		netInterface2 := newNetworkInterface(ns.Name, "machine-networkinterface2", network.Name, "10.0.0.6")
+		netInterface2.Spec.MachineRef = &commonv1alpha1.LocalUIDReference{
+			Name: machine.Name,
+			UID:  machine.UID,
+		}
+		ipPrefix2 := commonv1alpha1.MustParseIPPrefix("10.0.0.6/32")
+		netInterface2.Spec.Prefixes = []networkingv1alpha1.PrefixSource{{
+			Value: &ipPrefix2,
+		},
+		}
+		Expect(k8sClient.Create(ctx, netInterface2)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, netInterface2)
 
 		By("creating node object with a provider ID referencing the machine1")
 		node = &corev1.Node{

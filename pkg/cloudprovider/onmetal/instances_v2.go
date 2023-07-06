@@ -25,19 +25,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
+	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
 )
 
 type onmetalInstancesV2 struct {
 	targetClient     client.Client
 	onmetalClient    client.Client
 	onmetalNamespace string
+	clusterName      string
 }
 
-func newOnmetalInstancesV2(targetClient client.Client, onmetalClient client.Client, namespace string) cloudprovider.InstancesV2 {
+func newOnmetalInstancesV2(targetClient client.Client, onmetalClient client.Client, namespace, clusterName string) cloudprovider.InstancesV2 {
 	return &onmetalInstancesV2{
 		targetClient:     targetClient,
 		onmetalClient:    onmetalClient,
 		onmetalNamespace: namespace,
+		clusterName:      clusterName,
 	}
 }
 
@@ -88,6 +91,36 @@ func (o *onmetalInstancesV2) InstanceMetadata(ctx context.Context, node *corev1.
 			return nil, cloudprovider.InstanceNotFound
 		}
 		return nil, fmt.Errorf("failed to get machine object for node %s: %w", node.Name, err)
+	}
+
+	//add label for clusterName to machine object
+	machineBase := machine.DeepCopy()
+	if machine.Labels == nil {
+		machine.Labels = make(map[string]string)
+	}
+	machine.Labels[LabelClusterNameKey] = o.clusterName
+	klog.V(2).InfoS("Updating Machine by adding cluster name label", "Machine", client.ObjectKeyFromObject(machine), "Node", node)
+	if err := o.onmetalClient.Patch(ctx, machine, client.MergeFrom(machineBase)); err != nil {
+		return nil, fmt.Errorf("failed to patch Machine %s for Node %s: %w", client.ObjectKeyFromObject(machine), node, err)
+	}
+
+	for _, networkInterface := range machine.Spec.NetworkInterfaces {
+		nic := &networkingv1alpha1.NetworkInterface{}
+		nicName := fmt.Sprintf("%s-%s", machine.Name, networkInterface.Name)
+		if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: nicName}, nic); err != nil {
+			return nil, fmt.Errorf("failed to get network interface %s for machine %s: %w", client.ObjectKeyFromObject(nic), machine.Name, err)
+		}
+
+		// add label for clusterName to network interface of machine object
+		nicBase := nic.DeepCopy()
+		if nic.Labels == nil {
+			nic.Labels = make(map[string]string)
+		}
+		nic.Labels[LabelClusterNameKey] = o.clusterName
+		klog.V(2).InfoS("Updating NetworkInterface by adding cluster name label", "NetworkInterface", client.ObjectKeyFromObject(nic), "Node", node, "Label", nic.Labels[LabelClusterNameKey])
+		if err := o.onmetalClient.Patch(ctx, nic, client.MergeFrom(nicBase)); err != nil {
+			return nil, fmt.Errorf("failed to patch NetworkInterface %s for Node %s: %w", client.ObjectKeyFromObject(nic), node, err)
+		}
 	}
 
 	addresses := make([]corev1.NodeAddress, 0)

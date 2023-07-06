@@ -53,6 +53,8 @@ func (o onmetalRoutes) ListRoutes(ctx context.Context, clusterName string) ([]*c
 	nics := &networkingv1alpha1.NetworkInterfaceList{}
 	err := o.onmetalClient.List(ctx, nics, client.InNamespace(o.onmetalNamespace), client.MatchingFields{
 		networkInterfaceSpecNetworkRefNameField: o.cloudConfig.NetworkName,
+	}, client.MatchingLabels{
+		LabelClusterNameKey: clusterName,
 	})
 
 	if err != nil {
@@ -191,7 +193,7 @@ func (o onmetalRoutes) DeleteRoute(ctx context.Context, clusterName string, rout
 					for i, prefix := range nic.Status.Prefixes {
 						if prefix.Prefix.String() == route.DestinationCIDR {
 							nicBase := nic.DeepCopy()
-							nic.Spec.Prefixes = nic.Spec.Prefixes[:i+copy(nic.Spec.Prefixes[i:], nic.Spec.Prefixes[i+1:])]
+							nic.Spec.Prefixes = append(nic.Spec.Prefixes[:i], nic.Spec.Prefixes[i+1:]...)
 
 							klog.V(2).InfoS("Updating NetworkInterface by removing prefix", "NetworkInterface", client.ObjectKeyFromObject(nic), "Node", node, "Prefix", route.DestinationCIDR)
 							if err := o.onmetalClient.Patch(ctx, nic, client.MergeFrom(nicBase)); err != nil {
