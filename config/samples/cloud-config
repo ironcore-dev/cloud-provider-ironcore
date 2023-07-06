@@ -1,3 +1,4 @@
 # network name for the loadbalancer goes here
 networkName: my-network
 prefixName: my-prefix
+clusterName: my-cluster
