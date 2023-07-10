@@ -124,11 +124,12 @@ var _ = BeforeSuite(func() {
 	Expect(envtestext.WaitUntilAPIServicesReadyWithTimeout(apiServiceTimeout, testEnvExt, k8sClient, scheme.Scheme)).To(Succeed())
 })
 
-func SetupTest() (*corev1.Namespace, *onmetalLoadBalancer, *networkingv1alpha1.Network) {
+func SetupTest() (*corev1.Namespace, *onmetalLoadBalancer, *networkingv1alpha1.Network, string) {
 	var (
-		ns      = &corev1.Namespace{}
-		olb     = &onmetalLoadBalancer{}
-		network = &networkingv1alpha1.Network{}
+		ns          = &corev1.Namespace{}
+		olb         = &onmetalLoadBalancer{}
+		network     = &networkingv1alpha1.Network{}
+		clusterName = "test"
 	)
 
 	BeforeEach(func(ctx SpecContext) {
@@ -208,7 +209,7 @@ func SetupTest() (*corev1.Namespace, *onmetalLoadBalancer, *networkingv1alpha1.N
 		defer func() {
 			_ = cloudConfigFile.Close()
 		}()
-		cloudConfig := CloudConfig{NetworkName: network.Name, PrefixName: prefix.Name, ClusterName: "test"}
+		cloudConfig := CloudConfig{NetworkName: network.Name, PrefixName: prefix.Name, ClusterName: clusterName}
 		cloudConfigData, err := yaml.Marshal(&cloudConfig)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(os.WriteFile(cloudConfigFile.Name(), cloudConfigData, 0666)).To(Succeed())
@@ -227,5 +228,5 @@ func SetupTest() (*corev1.Namespace, *onmetalLoadBalancer, *networkingv1alpha1.N
 		newLB := newOnmetalLoadBalancer(k8sClient, k8sClient, ns.Name, cloudConfig)
 		*olb = *newLB.(*onmetalLoadBalancer)
 	})
-	return ns, olb, network
+	return ns, olb, network, clusterName
 }

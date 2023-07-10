@@ -32,7 +32,6 @@ import (
 )
 
 var _ = Describe("LoadBalancer", func() {
-	const clusterName = "test"
 
 	var (
 		service      *corev1.Service
@@ -40,7 +39,7 @@ var _ = Describe("LoadBalancer", func() {
 		netInterface *networkingv1alpha1.NetworkInterface
 	)
 
-	ns, olb, network := SetupTest()
+	ns, olb, network, clusterName := SetupTest()
 
 	BeforeEach(func(ctx SpecContext) {
 		By("creating a network interface for machine1")

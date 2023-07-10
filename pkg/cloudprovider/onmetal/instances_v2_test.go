@@ -32,14 +32,14 @@ import (
 )
 
 var _ = Describe("InstancesV2", func() {
-	ns, _, network := SetupTest()
+	ns, _, network, _ := SetupTest()
 
 	It("should get instance info", func(ctx SpecContext) {
 		By("creating a machine")
 		machine := &computev1alpha1.Machine{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
-				Name:      "machine1",
+				Namespace:    ns.Name,
+				GenerateName: "machine-",
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
@@ -48,14 +48,14 @@ var _ = Describe("InstancesV2", func() {
 				NetworkInterfaces: []computev1alpha1.NetworkInterface{
 					{
 						Name: "my-nic",
-						NetworkInterfaceSource: computev1alpha1.NetworkInterfaceSource{
-							NetworkInterfaceRef: &corev1.LocalObjectReference{
-								Name: "machine1-my-nic",
-							},
-						},
 					},
 				},
 				Volumes: []computev1alpha1.Volume{},
+			},
+		}
+		machine.Spec.NetworkInterfaces[0].NetworkInterfaceSource = computev1alpha1.NetworkInterfaceSource{
+			NetworkInterfaceRef: &corev1.LocalObjectReference{
+				Name: fmt.Sprintf("%s-my-nic", machine.Name),
 			},
 		}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
@@ -63,7 +63,7 @@ var _ = Describe("InstancesV2", func() {
 		By("creating a network interface for machine")
 		netInterface := &networkingv1alpha1.NetworkInterface{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "machine1-my-nic",
+				Name:      fmt.Sprintf("%s-my-nic", machine.Name),
 				Namespace: ns.Name,
 			},
 			Spec: networkingv1alpha1.NetworkInterfaceSpec{
@@ -139,12 +139,12 @@ var _ = Describe("InstancesV2", func() {
 
 		By("ensuring cluster name label is added to Machine object")
 		Eventually(Object(machine)).Should(SatisfyAll(
-			HaveField("Labels", map[string]string{LabelClusterNameKey: "test"}),
+			HaveField("Labels", map[string]string{LabeKeylClusterName: "test"}),
 		))
 
 		By("ensuring cluster name label is added to network interface of Machine object")
 		Eventually(Object(netInterface)).Should(SatisfyAll(
-			HaveField("Labels", map[string]string{LabelClusterNameKey: "test"}),
+			HaveField("Labels", map[string]string{LabeKeylClusterName: "test"}),
 		))
 
 	})

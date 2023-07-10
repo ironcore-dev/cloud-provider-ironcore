@@ -30,7 +30,6 @@ import (
 )
 
 var _ = Describe("Routes", func() {
-	const clusterName = "test"
 
 	var (
 		route           *cloudprovider.Route
@@ -40,7 +39,7 @@ var _ = Describe("Routes", func() {
 		destinationCIDR string
 	)
 
-	ns, _, network := SetupTest()
+	ns, _, network, clusterName := SetupTest()
 
 	BeforeEach(func(ctx SpecContext) {
 		By("creating machine")
@@ -55,13 +54,13 @@ var _ = Describe("Routes", func() {
 			},
 		}
 		machine := newMachine(ns.Name, "machine", networkInterfaces)
-		machine.Labels = map[string]string{LabelClusterNameKey: "test"}
+		machine.Labels = map[string]string{LabeKeylClusterName: "test"}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, machine)
 
 		By("creating a network interface for machine")
 		netInterface = newNetworkInterface(ns.Name, "machine-networkinterface", network.Name, "10.0.0.5")
-		netInterface.Labels = map[string]string{LabelClusterNameKey: "test"}
+		netInterface.Labels = map[string]string{LabeKeylClusterName: "test"}
 		netInterface.Spec.MachineRef = &commonv1alpha1.LocalUIDReference{
 			Name: machine.Name,
 			UID:  machine.UID,
@@ -100,14 +99,14 @@ var _ = Describe("Routes", func() {
 		Expect(k8sClient.Create(ctx, node)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, node)
 
-		By("patching the network interface status to have a valid internal IP interface address")
+		By("patching the network interface status to have a valid internal IP address")
 		netInterfaceBase := netInterface.DeepCopy()
 		netInterface.Status.State = networkingv1alpha1.NetworkInterfaceStateAvailable
 		netInterface.Status.Phase = networkingv1alpha1.NetworkInterfacePhaseBound
 		netInterface.Status.Prefixes = []commonv1alpha1.IPPrefix{commonv1alpha1.MustParseIPPrefix("10.0.0.5/32")}
 		Expect(k8sClient.Status().Patch(ctx, netInterface, client.MergeFrom(netInterfaceBase))).To(Succeed())
 
-		By("patching the machine status to have a valid internal IP interface address")
+		By("patching the machine status to have a valid internal IP address")
 		machineBase := machine.DeepCopy()
 		machine.Status.State = computev1alpha1.MachineStateRunning
 		machine.Status.NetworkInterfaces = []computev1alpha1.NetworkInterfaceStatus{{
@@ -135,6 +134,62 @@ var _ = Describe("Routes", func() {
 	})
 
 	It("should list Routes for all network interfaces in current network", func(ctx SpecContext) {
+		By("getting list of routes")
+		routes := []*cloudprovider.Route{{
+			Name:            clusterName + "-" + destinationCIDR,
+			DestinationCIDR: destinationCIDR,
+			TargetNode:      types.NodeName(node.Name),
+		}}
+		Expect(oRoutes.ListRoutes(ctx, clusterName)).Should(Equal(routes))
+	})
+
+	It("should not list Routes for Network Interface not having cluster name label", func(ctx SpecContext) {
+		By("creating machine2")
+		networkInterfaces := []computev1alpha1.NetworkInterface{
+			{
+				Name: "networkinterface2",
+				NetworkInterfaceSource: computev1alpha1.NetworkInterfaceSource{
+					NetworkInterfaceRef: &corev1.LocalObjectReference{
+						Name: "machine2-networkinterface2",
+					},
+				},
+			},
+		}
+		machine2 := newMachine(ns.Name, "machine2", networkInterfaces)
+		Expect(k8sClient.Create(ctx, machine2)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, machine2)
+
+		By("creating a network interface2 for machine2")
+		netInterface2 := newNetworkInterface(ns.Name, "machine2-networkinterface2", network.Name, "10.0.0.7")
+		netInterface2.Spec.MachineRef = &commonv1alpha1.LocalUIDReference{
+			Name: machine2.Name,
+			UID:  machine2.UID,
+		}
+		ipPrefix := commonv1alpha1.MustParseIPPrefix("10.0.0.7/32")
+		netInterface2.Spec.Prefixes = []networkingv1alpha1.PrefixSource{{
+			Value: &ipPrefix,
+		},
+		}
+		Expect(k8sClient.Create(ctx, netInterface2)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, netInterface2)
+
+		By("patching the network interface2 status to have a valid internal IP address")
+		netInterface2Base := netInterface2.DeepCopy()
+		netInterface2.Status.State = networkingv1alpha1.NetworkInterfaceStateAvailable
+		netInterface2.Status.Phase = networkingv1alpha1.NetworkInterfacePhaseBound
+		netInterface2.Status.Prefixes = []commonv1alpha1.IPPrefix{commonv1alpha1.MustParseIPPrefix("10.0.0.7/32")}
+		Expect(k8sClient.Status().Patch(ctx, netInterface2, client.MergeFrom(netInterface2Base))).To(Succeed())
+
+		By("patching the machine status to have a valid internal IP address")
+		machine2Base := machine2.DeepCopy()
+		machine2.Status.State = computev1alpha1.MachineStateRunning
+		machine2.Status.NetworkInterfaces = []computev1alpha1.NetworkInterfaceStatus{{
+			Name:  networkInterfaces[0].Name,
+			Phase: computev1alpha1.NetworkInterfacePhaseBound,
+			IPs:   []commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.7")},
+		}}
+		Expect(k8sClient.Status().Patch(ctx, machine2, client.MergeFrom(machine2Base))).To(Succeed())
+
 		By("getting list of routes")
 		routes := []*cloudprovider.Route{{
 			Name:            clusterName + "-" + destinationCIDR,
