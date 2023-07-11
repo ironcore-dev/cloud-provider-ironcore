@@ -54,13 +54,13 @@ var _ = Describe("Routes", func() {
 			},
 		}
 		machine := newMachine(ns.Name, "machine", networkInterfaces)
-		machine.Labels = map[string]string{LabeKeylClusterName: "test"}
+		machine.Labels = map[string]string{LabeKeylClusterName: clusterName}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, machine)
 
 		By("creating a network interface for machine")
 		netInterface = newNetworkInterface(ns.Name, "machine-networkinterface", network.Name, "10.0.0.5")
-		netInterface.Labels = map[string]string{LabeKeylClusterName: "test"}
+		netInterface.Labels = map[string]string{LabeKeylClusterName: clusterName}
 		netInterface.Spec.MachineRef = &commonv1alpha1.LocalUIDReference{
 			Name: machine.Name,
 			UID:  machine.UID,
