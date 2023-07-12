@@ -27,7 +27,7 @@ import (
 
 var _ = Describe("Config", func() {
 	It("should load a correct provider config", func() {
-		sampleConfig := map[string]string{"networkName": "my-network", "prefixName": "my-prefix"}
+		sampleConfig := map[string]string{"networkName": "my-network", "prefixName": "my-prefix", "clusterName": "my-cluster"}
 		sampleConfigData, err := yaml.Marshal(sampleConfig)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -71,10 +71,11 @@ var _ = Describe("Config", func() {
 		Expect(config.Namespace).To(Equal("test"))
 		Expect(config.cloudConfig.NetworkName).To(Equal("my-network"))
 		Expect(config.cloudConfig.PrefixName).To(Equal("my-prefix"))
+		Expect(config.cloudConfig.ClusterName).To(Equal("my-cluster"))
 	})
 
 	It("should get the default namespace if no namespace was defined for an auth context", func() {
-		sampleConfig := map[string]string{"networkName": "my-network", "prefixName": "my-prefix"}
+		sampleConfig := map[string]string{"networkName": "my-network", "prefixName": "my-prefix", "clusterName": "my-cluster"}
 		sampleConfigData, err := yaml.Marshal(sampleConfig)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -120,9 +121,10 @@ var _ = Describe("Config", func() {
 		Expect(config.Namespace).To(Equal("default"))
 		Expect(config.cloudConfig.NetworkName).To(Equal("my-network"))
 		Expect(config.cloudConfig.PrefixName).To(Equal("my-prefix"))
+		Expect(config.cloudConfig.ClusterName).To(Equal("my-cluster"))
 	})
 
-	It("should fail on empty cloud provider config", func() {
+	It("should fail on empty networkName in cloud provider config", func() {
 		emptyConfig := map[string]string{"networkName": ""}
 		configData, err := yaml.Marshal(emptyConfig)
 		Expect(err).NotTo(HaveOccurred())
@@ -130,6 +132,17 @@ var _ = Describe("Config", func() {
 		configReader := strings.NewReader(string(configData))
 		config, err := LoadCloudProviderConfig(configReader)
 		Expect(err.Error()).To(Equal("networkName missing in cloud config"))
+		Expect(config).To(BeNil())
+	})
+
+	It("should fail on empty clusterName in cloud provider config", func() {
+		emptyConfig := map[string]string{"networkName": "my-network", "clusterName": ""}
+		configData, err := yaml.Marshal(emptyConfig)
+		Expect(err).NotTo(HaveOccurred())
+
+		configReader := strings.NewReader(string(configData))
+		config, err := LoadCloudProviderConfig(configReader)
+		Expect(err.Error()).To(Equal("clusterName missing in cloud config"))
 		Expect(config).To(BeNil())
 	})
 })

@@ -36,6 +36,7 @@ type cloudProviderConfig struct {
 type CloudConfig struct {
 	NetworkName string `json:"networkName"`
 	PrefixName  string `json:"prefixName,omitempty"`
+	ClusterName string `json:"clusterName"`
 }
 
 var (
@@ -60,6 +61,10 @@ func LoadCloudProviderConfig(f io.Reader) (*cloudProviderConfig, error) {
 
 	if cloudConfig.NetworkName == "" {
 		return nil, fmt.Errorf("networkName missing in cloud config")
+	}
+
+	if cloudConfig.ClusterName == "" {
+		return nil, fmt.Errorf("clusterName missing in cloud config")
 	}
 
 	onmetalKubeconfigData, err := os.ReadFile(OnmetalKubeconfigPath)

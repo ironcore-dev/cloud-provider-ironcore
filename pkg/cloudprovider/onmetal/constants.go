@@ -25,4 +25,6 @@ const (
 	AnnotationKeyServiceNamespace = "service-namespace"
 	// AnnotationKeyServiceUID is the service UID annotation key name
 	AnnotationKeyServiceUID = "service-uid"
+	// LabeKeylClusterName is the cluster name label key name
+	LabeKeylClusterName = "kubernetes.io/cluster"
 )

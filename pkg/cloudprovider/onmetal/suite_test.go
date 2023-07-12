@@ -20,15 +20,10 @@ import (
 	"testing"
 	"time"
 
-	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
-
-	"k8s.io/apimachinery/pkg/api/resource"
-
-	corev1alpha1 "github.com/onmetal/onmetal-api/api/core/v1alpha1"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -45,7 +40,9 @@ import (
 
 	"github.com/onmetal/controller-utils/buildutils"
 	"github.com/onmetal/controller-utils/modutils"
+	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
 	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
+	corev1alpha1 "github.com/onmetal/onmetal-api/api/core/v1alpha1"
 	ipamv1alpha1 "github.com/onmetal/onmetal-api/api/ipam/v1alpha1"
 	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
 	storagev1alpha1 "github.com/onmetal/onmetal-api/api/storage/v1alpha1"
@@ -127,11 +124,12 @@ var _ = BeforeSuite(func() {
 	Expect(envtestext.WaitUntilAPIServicesReadyWithTimeout(apiServiceTimeout, testEnvExt, k8sClient, scheme.Scheme)).To(Succeed())
 })
 
-func SetupTest() (*corev1.Namespace, *onmetalLoadBalancer, *networkingv1alpha1.Network) {
+func SetupTest() (*corev1.Namespace, *onmetalLoadBalancer, *networkingv1alpha1.Network, string) {
 	var (
-		ns      = &corev1.Namespace{}
-		olb     = &onmetalLoadBalancer{}
-		network = &networkingv1alpha1.Network{}
+		ns          = &corev1.Namespace{}
+		olb         = &onmetalLoadBalancer{}
+		network     = &networkingv1alpha1.Network{}
+		clusterName = "test"
 	)
 
 	BeforeEach(func(ctx SpecContext) {
@@ -211,7 +209,7 @@ func SetupTest() (*corev1.Namespace, *onmetalLoadBalancer, *networkingv1alpha1.N
 		defer func() {
 			_ = cloudConfigFile.Close()
 		}()
-		cloudConfig := CloudConfig{NetworkName: network.Name, PrefixName: prefix.Name}
+		cloudConfig := CloudConfig{NetworkName: network.Name, PrefixName: prefix.Name, ClusterName: clusterName}
 		cloudConfigData, err := yaml.Marshal(&cloudConfig)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(os.WriteFile(cloudConfigFile.Name(), cloudConfigData, 0666)).To(Succeed())
@@ -230,5 +228,5 @@ func SetupTest() (*corev1.Namespace, *onmetalLoadBalancer, *networkingv1alpha1.N
 		newLB := newOnmetalLoadBalancer(k8sClient, k8sClient, ns.Name, cloudConfig)
 		*olb = *newLB.(*onmetalLoadBalancer)
 	})
-	return ns, olb, network
+	return ns, olb, network, clusterName
 }
