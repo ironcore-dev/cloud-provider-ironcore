@@ -32,9 +32,17 @@ import (
 )
 
 var _ = Describe("InstancesV2", func() {
-	ns, _, network, clusterName := SetupTest()
+	var (
+		instancesProvider cloudprovider.InstancesV2
+	)
+	ns, cp, network, clusterName := SetupTest()
 
 	It("should get instance info", func(ctx SpecContext) {
+		By("instantiating the instances v2 provider")
+		var ok bool
+		instancesProvider, ok = (*cp).InstancesV2()
+		Expect(ok).To(BeTrue())
+
 		By("creating a machine")
 		machine := &computev1alpha1.Machine{
 			ObjectMeta: metav1.ObjectMeta{
@@ -104,23 +112,20 @@ var _ = Describe("InstancesV2", func() {
 		Expect(k8sClient.Create(ctx, node)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, node)
 
-		By("getting the instances v2 interface")
-		instances, ok := cloudProvider.InstancesV2()
-		Expect(ok).To(BeTrue())
-
 		By("ensuring that an instance for a node exists")
-		ok, err := instances.InstanceExists(ctx, node)
+		ok, err := instancesProvider.InstanceExists(ctx, node)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ok).To(BeTrue())
 
 		By("ensuring that the instance is not shut down")
-		ok, err = instances.InstanceShutdown(ctx, node)
+		ok, err = instancesProvider.InstanceShutdown(ctx, node)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(ok).To(BeFalse())
 
 		By("ensuring that the instance meta data has the correct addresses")
-		instanceMetadata, err := instances.InstanceMetadata(ctx, node)
+		instanceMetadata, err := instancesProvider.InstanceMetadata(ctx, node)
 		Expect(err).NotTo(HaveOccurred())
+
 		Eventually(instanceMetadata).Should(SatisfyAll(
 			HaveField("ProviderID", getProviderID(machine.Namespace, machine.Name)),
 			HaveField("InstanceType", machine.Spec.MachineClassRef.Name),
@@ -159,12 +164,8 @@ var _ = Describe("InstancesV2", func() {
 		Expect(k8sClient.Create(ctx, node)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, node)
 
-		By("getting the instances v2 interface")
-		instances, ok := cloudProvider.InstancesV2()
-		Expect(ok).To(BeTrue())
-
 		By("ensuring that an instance for a node does not exist")
-		ok, err := instances.InstanceExists(ctx, node)
+		ok, err := instancesProvider.InstanceExists(ctx, node)
 		Expect(err).To(Equal(cloudprovider.InstanceNotFound))
 		Expect(ok).To(BeFalse())
 	})
@@ -179,12 +180,8 @@ var _ = Describe("InstancesV2", func() {
 		Expect(k8sClient.Create(ctx, node)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, node)
 
-		By("getting the instances v2 interface")
-		instances, ok := cloudProvider.InstancesV2()
-		Expect(ok).To(BeTrue())
-
 		By("ensuring to fail getting the instance metadata")
-		metaData, err := instances.InstanceMetadata(ctx, node)
+		metaData, err := instancesProvider.InstanceMetadata(ctx, node)
 		Expect(err).To(Equal(cloudprovider.InstanceNotFound))
 		Expect(metaData).To(BeNil())
 	})
@@ -199,13 +196,8 @@ var _ = Describe("InstancesV2", func() {
 		Expect(k8sClient.Create(ctx, node)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, node)
 
-		By("getting the instances v2 interface")
-		instances, ok := cloudProvider.InstancesV2()
-		Expect(ok).To(BeTrue())
-
-		By("ensuring to fail getting the instance metadata")
-
-		ok, err := instances.InstanceShutdown(ctx, node)
+		By("ensuring the shutdown state of a node")
+		ok, err := instancesProvider.InstanceShutdown(ctx, node)
 		Expect(err).To(Equal(cloudprovider.InstanceNotFound))
 		Expect(ok).To(BeFalse())
 	})

@@ -49,9 +49,8 @@ func newOnmetalRoutes(targetClient client.Client, onmetalClient client.Client, n
 func (o onmetalRoutes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
 	klog.V(2).InfoS("List Routes", "Cluster", clusterName)
 
-	// get all network interfaces for the network
-	nics := &networkingv1alpha1.NetworkInterfaceList{}
-	if err := o.onmetalClient.List(ctx, nics, client.InNamespace(o.onmetalNamespace), client.MatchingFields{
+	networkInterfaces := &networkingv1alpha1.NetworkInterfaceList{}
+	if err := o.onmetalClient.List(ctx, networkInterfaces, client.InNamespace(o.onmetalNamespace), client.MatchingFields{
 		networkInterfaceSpecNetworkRefNameField: o.cloudConfig.NetworkName,
 	}, client.MatchingLabels{
 		LabeKeylClusterName: clusterName,
@@ -61,14 +60,19 @@ func (o onmetalRoutes) ListRoutes(ctx context.Context, clusterName string) ([]*c
 
 	var routes []*cloudprovider.Route
 	// iterate over all network interfaces and collect all the prefixes as Routes
-	for _, nic := range nics.Items {
+	for _, nic := range networkInterfaces.Items {
 		if nic.Spec.MachineRef != nil && nic.Spec.MachineRef.Name != "" {
 			for _, prefix := range nic.Status.Prefixes {
 				destinationCIDR := prefix.String()
+				targetNodeAddresses, err := o.getTargetNodeAddresses(ctx, nic.Spec.MachineRef.Name)
+				if err != nil {
+					return nil, err
+				}
 				route := &cloudprovider.Route{
-					Name:            clusterName + "-" + destinationCIDR,
-					DestinationCIDR: destinationCIDR,
-					TargetNode:      types.NodeName(nic.Spec.MachineRef.Name),
+					Name:                clusterName + "-" + destinationCIDR,
+					DestinationCIDR:     destinationCIDR,
+					TargetNode:          types.NodeName(nic.Spec.MachineRef.Name),
+					TargetNodeAddresses: targetNodeAddresses,
 				}
 
 				routes = append(routes, route)
@@ -208,4 +212,12 @@ func (o onmetalRoutes) DeleteRoute(ctx context.Context, clusterName string, rout
 	klog.V(2).InfoS("Deleted Route", "Cluster", clusterName, "Route", route)
 
 	return nil
+}
+
+func (o onmetalRoutes) getTargetNodeAddresses(ctx context.Context, nodeName string) ([]corev1.NodeAddress, error) {
+	node := &corev1.Node{}
+	if err := o.targetClient.Get(ctx, client.ObjectKey{Name: nodeName}, node); err != nil {
+		return nil, fmt.Errorf("failed to get node object %s: %w", nodeName, err)
+	}
+	return node.Status.Addresses, nil
 }

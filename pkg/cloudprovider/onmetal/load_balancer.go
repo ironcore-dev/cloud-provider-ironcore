@@ -184,7 +184,7 @@ func waitLoadBalancerActive(ctx context.Context, clusterName string, service *v1
 		Steps:    waitLoadbalancerActiveSteps,
 	}
 
-	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+	err := wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
 		err := onmetalClient.Get(ctx, client.ObjectKey{Namespace: service.Namespace, Name: loadBalancer.Name}, loadBalancer)
 		if err == nil {
 			if len(loadBalancer.Status.IPs) > 0 {
@@ -251,10 +251,17 @@ func (o *onmetalLoadBalancer) getNetworkInterfacesForNodes(ctx context.Context, 
 
 		for _, machineNIC := range machine.Spec.NetworkInterfaces {
 			networkInterface := &networkingv1alpha1.NetworkInterface{}
+
 			networkInterfaceName := fmt.Sprintf("%s-%s", machine.Name, machineNIC.Name)
+
+			if machineNIC.NetworkInterfaceRef != nil {
+				networkInterfaceName = machineNIC.NetworkInterfaceRef.Name
+			}
+
 			if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: networkInterfaceName}, networkInterface); err != nil {
 				return nil, fmt.Errorf("failed to get network interface %s for machine %s: %w", client.ObjectKeyFromObject(networkInterface), client.ObjectKeyFromObject(machine), err)
 			}
+
 			if networkInterface.Spec.NetworkRef.Name == networkName {
 				networkInterfaces = append(networkInterfaces, commonv1alpha1.LocalUIDReference{
 					Name: networkInterface.Name,

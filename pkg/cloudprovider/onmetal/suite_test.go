@@ -51,11 +51,10 @@ import (
 )
 
 var (
-	cfg           *rest.Config
-	k8sClient     client.Client
-	testEnv       *envtest.Environment
-	testEnvExt    *envtestext.EnvironmentExtensions
-	cloudProvider cloudprovider.Interface
+	cfg        *rest.Config
+	k8sClient  client.Client
+	testEnv    *envtest.Environment
+	testEnvExt *envtestext.EnvironmentExtensions
 )
 
 const (
@@ -124,10 +123,10 @@ var _ = BeforeSuite(func() {
 	Expect(envtestext.WaitUntilAPIServicesReadyWithTimeout(apiServiceTimeout, testEnvExt, k8sClient, scheme.Scheme)).To(Succeed())
 })
 
-func SetupTest() (*corev1.Namespace, *onmetalLoadBalancer, *networkingv1alpha1.Network, string) {
+func SetupTest() (*corev1.Namespace, *cloudprovider.Interface, *networkingv1alpha1.Network, string) {
 	var (
 		ns          = &corev1.Namespace{}
-		olb         = &onmetalLoadBalancer{}
+		cp          cloudprovider.Interface
 		network     = &networkingv1alpha1.Network{}
 		clusterName = "test"
 	)
@@ -169,7 +168,7 @@ func SetupTest() (*corev1.Namespace, *onmetalLoadBalancer, *networkingv1alpha1.N
 			},
 			Spec: ipamv1alpha1.PrefixSpec{
 				IPFamily: corev1.IPv4Protocol,
-				Prefix:   commonv1alpha1.MustParseNewIPPrefix("100.0.0.0/24"),
+				Prefix:   commonv1alpha1.MustParseNewIPPrefix("100.0.0.0/16"),
 			},
 		}
 		Expect(k8sClient.Create(ctx, prefix)).To(Succeed())
@@ -221,12 +220,10 @@ func SetupTest() (*corev1.Namespace, *onmetalLoadBalancer, *networkingv1alpha1.N
 		Expect(err).NotTo(HaveOccurred())
 
 		clientBuilder := clientbuilder.NewDynamicClientBuilder(testEnv.Config, k8sClientSet.CoreV1(), "default")
-		cloudProvider, err = cloudprovider.InitCloudProvider(ProviderName, cloudConfigFile.Name())
+		cp, err = cloudprovider.InitCloudProvider(ProviderName, cloudConfigFile.Name())
 		Expect(err).NotTo(HaveOccurred())
-		cloudProvider.Initialize(clientBuilder, cloudProviderCtx.Done())
-
-		newLB := newOnmetalLoadBalancer(k8sClient, k8sClient, ns.Name, cloudConfig)
-		*olb = *newLB.(*onmetalLoadBalancer)
+		cp.Initialize(clientBuilder, cloudProviderCtx.Done())
 	})
-	return ns, olb, network, clusterName
+
+	return ns, &cp, network, clusterName
 }
