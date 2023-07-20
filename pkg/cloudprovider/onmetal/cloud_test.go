@@ -20,22 +20,22 @@ import (
 )
 
 var _ = Describe("Cloud", func() {
-	SetupTest()
+	_, cp, _, _ := SetupTest()
 
 	It("should ensure the correct cloud provider setup", func() {
-		Expect(cloudProvider.HasClusterID()).To(BeTrue())
+		Expect((*cp).HasClusterID()).To(BeTrue())
 
-		Expect(cloudProvider.ProviderName()).To(Equal("onmetal"))
+		Expect((*cp).ProviderName()).To(Equal("onmetal"))
 
-		clusters, ok := cloudProvider.Clusters()
+		clusters, ok := (*cp).Clusters()
 		Expect(clusters).To(BeNil())
 		Expect(ok).To(BeFalse())
 
-		instances, ok := cloudProvider.Instances()
+		instances, ok := (*cp).Instances()
 		Expect(instances).To(BeNil())
 		Expect(ok).To(BeFalse())
 
-		zones, ok := cloudProvider.Zones()
+		zones, ok := (*cp).Zones()
 		Expect(zones).To(BeNil())
 		Expect(ok).To(BeFalse())
 	})
