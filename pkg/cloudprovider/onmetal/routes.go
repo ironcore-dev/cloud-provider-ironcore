@@ -185,7 +185,7 @@ func (o onmetalRoutes) DeleteRoute(ctx context.Context, clusterName string, rout
 				// if the interface is found, add the prefix to the network interface
 				if interfaceFound {
 					// get the network interface object
-					networkInterfaceName := fmt.Sprintf("%s-%s", machine.Name, networkInterface.Name)
+					networkInterfaceName := getNetworkInterfaceName(machine, networkInterface)
 					nic := &networkingv1alpha1.NetworkInterface{}
 					if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: networkInterfaceName}, nic); err != nil {
 						return err
@@ -196,8 +196,8 @@ func (o onmetalRoutes) DeleteRoute(ctx context.Context, clusterName string, rout
 						if prefix.Prefix.String() == route.DestinationCIDR {
 							nicBase := nic.DeepCopy()
 							nic.Spec.Prefixes = append(nic.Spec.Prefixes[:i], nic.Spec.Prefixes[i+1:]...)
+							klog.V(2).InfoS("Prefix found and removed", "Prefix", prefix.Prefix.String(), "Prefixes after", nic.Spec.Prefixes)
 
-							klog.V(2).InfoS("Updating NetworkInterface by removing prefix", "NetworkInterface", client.ObjectKeyFromObject(nic), "Node", nodeName, "Prefix", route.DestinationCIDR)
 							if err := o.onmetalClient.Patch(ctx, nic, client.MergeFrom(nicBase)); err != nil {
 								return fmt.Errorf("failed to patch NetworkInterface %s for Node %s: %w", client.ObjectKeyFromObject(nic), nodeName, err)
 							}
@@ -212,6 +212,17 @@ func (o onmetalRoutes) DeleteRoute(ctx context.Context, clusterName string, rout
 	klog.V(2).InfoS("Deleted Route", "Cluster", clusterName, "Route", route)
 
 	return nil
+}
+
+func getNetworkInterfaceName(machine *computev1alpha1.Machine, networkInterface computev1alpha1.NetworkInterfaceStatus) string {
+	for _, nic := range machine.Spec.NetworkInterfaces {
+		if nic.Name == networkInterface.Name {
+			if nic.NetworkInterfaceRef != nil {
+				return nic.NetworkInterfaceRef.Name
+			}
+		}
+	}
+	return fmt.Sprintf("%s-%s", machine.Name, networkInterface.Name)
 }
 
 func (o onmetalRoutes) getTargetNodeAddresses(ctx context.Context, nodeName string) ([]corev1.NodeAddress, error) {
