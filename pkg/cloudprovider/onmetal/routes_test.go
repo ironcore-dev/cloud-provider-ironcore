@@ -50,7 +50,7 @@ var _ = Describe("Routes", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
 				GenerateName: "machine-",
-				Labels:       map[string]string{LabeKeylClusterName: clusterName},
+				Labels:       map[string]string{LabelKeyClusterName: clusterName},
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
@@ -66,7 +66,7 @@ var _ = Describe("Routes", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
 				Name:      fmt.Sprintf("%s-%s", machine.Name, "networkinterface"),
-				Labels:    map[string]string{LabeKeylClusterName: clusterName},
+				Labels:    map[string]string{LabelKeyClusterName: clusterName},
 			},
 			Spec: networkingv1alpha1.NetworkInterfaceSpec{
 				NetworkRef: corev1.LocalObjectReference{Name: network.Name},
@@ -245,7 +245,7 @@ var _ = Describe("Routes", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
 				GenerateName: "machine-",
-				Labels:       map[string]string{LabeKeylClusterName: clusterName},
+				Labels:       map[string]string{LabelKeyClusterName: clusterName},
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
@@ -261,7 +261,7 @@ var _ = Describe("Routes", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
 				Name:      fmt.Sprintf("%s-%s", machine.Name, "primary"),
-				Labels:    map[string]string{LabeKeylClusterName: clusterName},
+				Labels:    map[string]string{LabelKeyClusterName: clusterName},
 			},
 			Spec: networkingv1alpha1.NetworkInterfaceSpec{
 				NetworkRef: corev1.LocalObjectReference{Name: network.Name},

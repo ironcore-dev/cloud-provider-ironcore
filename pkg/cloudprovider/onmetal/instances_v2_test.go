@@ -144,12 +144,12 @@ var _ = Describe("InstancesV2", func() {
 
 		By("ensuring cluster name label is added to Machine object")
 		Eventually(Object(machine)).Should(SatisfyAll(
-			HaveField("Labels", map[string]string{LabeKeylClusterName: clusterName}),
+			HaveField("Labels", map[string]string{LabelKeyClusterName: clusterName}),
 		))
 
 		By("ensuring cluster name label is added to network interface of Machine object")
 		Eventually(Object(netInterface)).Should(SatisfyAll(
-			HaveField("Labels", map[string]string{LabeKeylClusterName: clusterName}),
+			HaveField("Labels", map[string]string{LabelKeyClusterName: clusterName}),
 		))
 
 	})
