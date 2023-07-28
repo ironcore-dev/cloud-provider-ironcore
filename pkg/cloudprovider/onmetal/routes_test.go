@@ -36,6 +36,8 @@ var _ = Describe("Routes", func() {
 
 	var (
 		routesProvider cloudprovider.Routes
+		machine        *computev1alpha1.Machine
+		node           *corev1.Node
 	)
 
 	BeforeEach(func(ctx SpecContext) {
@@ -43,15 +45,12 @@ var _ = Describe("Routes", func() {
 		var ok bool
 		routesProvider, ok = (*cp).Routes()
 		Expect(ok).To(BeTrue())
-	})
 
-	It("should list Routes for all network interfaces in current network", func(ctx SpecContext) {
 		By("creating a machine object")
-		machine := &computev1alpha1.Machine{
+		machine = &computev1alpha1.Machine{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
 				GenerateName: "machine-",
-				Labels:       map[string]string{LabelKeyClusterName: clusterName},
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
@@ -61,6 +60,26 @@ var _ = Describe("Routes", func() {
 		}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, machine)
+
+		By("creating node object with a provider ID referencing the machine")
+		node = &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: machine.Name,
+			},
+			Spec: corev1.NodeSpec{
+				ProviderID: getProviderID(machine.Namespace, machine.Name),
+			},
+		}
+		Expect(k8sClient.Create(ctx, node)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, node)
+	})
+
+	It("should list Routes for all network interfaces in current network", func(ctx SpecContext) {
+
+		By("patching the machine with cluster name label")
+		baseMachine := machine.DeepCopy()
+		machine.ObjectMeta.Labels = map[string]string{LabelKeyClusterName: clusterName}
+		Expect(k8sClient.Status().Patch(ctx, machine, client.MergeFrom(baseMachine))).To(Succeed())
 
 		By("creating a static network interface for machine")
 		staticNetworkInterface := &networkingv1alpha1.NetworkInterface{
@@ -116,19 +135,7 @@ var _ = Describe("Routes", func() {
 		Expect(k8sClient.Create(ctx, ephemeralNetworkInterface)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, ephemeralNetworkInterface)
 
-		By("creating node object with a provider ID referencing the machine")
-		node := &corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: machine.Name,
-			},
-			Spec: corev1.NodeSpec{
-				ProviderID: getProviderID(machine.Namespace, machine.Name),
-			},
-		}
-		Expect(k8sClient.Create(ctx, node)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, node)
-
-		By("patching the addresses node status")
+		By("patching the addresses to node status")
 		nodeBase := node.DeepCopy()
 		node.Status.Addresses = []corev1.NodeAddress{
 			{
@@ -227,20 +234,6 @@ var _ = Describe("Routes", func() {
 	})
 
 	It("should not list routes for network interface not having cluster name label", func(ctx SpecContext) {
-		By("creating a machine object without cluster label")
-		machine := &computev1alpha1.Machine{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "machine-",
-			},
-			Spec: computev1alpha1.MachineSpec{
-				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
-				Image:           "my-image:latest",
-				Volumes:         []computev1alpha1.Volume{},
-			},
-		}
-		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, machine)
 
 		By("creating a network interface for machine without cluster label")
 		networkInterface := &networkingv1alpha1.NetworkInterface{
@@ -265,19 +258,7 @@ var _ = Describe("Routes", func() {
 		Expect(k8sClient.Create(ctx, networkInterface)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, networkInterface)
 
-		By("creating node object with a provider ID referencing the machine")
-		node := &corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: machine.Name,
-			},
-			Spec: corev1.NodeSpec{
-				ProviderID: getProviderID(machine.Namespace, machine.Name),
-			},
-		}
-		Expect(k8sClient.Create(ctx, node)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, node)
-
-		By("patching the addresses node status")
+		By("patching the addresses to node status")
 		nodeBase := node.DeepCopy()
 		node.Status.Addresses = []corev1.NodeAddress{
 			{
@@ -320,21 +301,11 @@ var _ = Describe("Routes", func() {
 	})
 
 	It("should ensure that a prefix has been created for a route", func(ctx SpecContext) {
-		By("creating a machine object")
-		machine := &computev1alpha1.Machine{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "machine-",
-				Labels:       map[string]string{LabelKeyClusterName: clusterName},
-			},
-			Spec: computev1alpha1.MachineSpec{
-				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
-				Image:           "my-image:latest",
-				Volumes:         []computev1alpha1.Volume{},
-			},
-		}
-		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, machine)
+
+		By("patching the machine with cluster name label")
+		baseMachine := machine.DeepCopy()
+		machine.ObjectMeta.Labels = map[string]string{LabelKeyClusterName: clusterName}
+		Expect(k8sClient.Status().Patch(ctx, machine, client.MergeFrom(baseMachine))).To(Succeed())
 
 		By("creating a static network interface for machine")
 		staticNetworkInterface := &networkingv1alpha1.NetworkInterface{
@@ -387,19 +358,7 @@ var _ = Describe("Routes", func() {
 		Expect(k8sClient.Create(ctx, ephemeralNetworkInterface)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, ephemeralNetworkInterface)
 
-		By("creating node object with a provider ID referencing the machine")
-		node := &corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: machine.Name,
-			},
-			Spec: corev1.NodeSpec{
-				ProviderID: getProviderID(machine.Namespace, machine.Name),
-			},
-		}
-		Expect(k8sClient.Create(ctx, node)).To(Succeed())
-		DeferCleanup(k8sClient.Delete, node)
-
-		By("patching the addresses node status")
+		By("patching the addresses to node status")
 		nodeBase := node.DeepCopy()
 		node.Status.Addresses = []corev1.NodeAddress{
 			{
