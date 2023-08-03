@@ -53,7 +53,7 @@ func (o onmetalRoutes) ListRoutes(ctx context.Context, clusterName string) ([]*c
 	if err := o.onmetalClient.List(ctx, networkInterfaces, client.InNamespace(o.onmetalNamespace), client.MatchingFields{
 		networkInterfaceSpecNetworkRefNameField: o.cloudConfig.NetworkName,
 	}, client.MatchingLabels{
-		LabeKeylClusterName: clusterName,
+		LabelKeyClusterName: clusterName,
 	}); err != nil {
 		return nil, err
 	}

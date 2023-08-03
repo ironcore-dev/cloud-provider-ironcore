@@ -98,7 +98,7 @@ func (o *onmetalInstancesV2) InstanceMetadata(ctx context.Context, node *corev1.
 	if machine.Labels == nil {
 		machine.Labels = make(map[string]string)
 	}
-	machine.Labels[LabeKeylClusterName] = o.clusterName
+	machine.Labels[LabelKeyClusterName] = o.clusterName
 	klog.V(2).InfoS("Adding cluster name label to Machine object", "Machine", client.ObjectKeyFromObject(machine), "Node", node.Name)
 	if err := o.onmetalClient.Patch(ctx, machine, client.MergeFrom(machineBase)); err != nil {
 		return nil, fmt.Errorf("failed to patch Machine %s for Node %s: %w", client.ObjectKeyFromObject(machine), node.Name, err)
@@ -116,8 +116,8 @@ func (o *onmetalInstancesV2) InstanceMetadata(ctx context.Context, node *corev1.
 		if nic.Labels == nil {
 			nic.Labels = make(map[string]string)
 		}
-		nic.Labels[LabeKeylClusterName] = o.clusterName
-		klog.V(2).InfoS("Adding cluster name label to NetworkInterface", "NetworkInterface", client.ObjectKeyFromObject(nic), "Node", node.Name, "Label", nic.Labels[LabeKeylClusterName])
+		nic.Labels[LabelKeyClusterName] = o.clusterName
+		klog.V(2).InfoS("Adding cluster name label to NetworkInterface", "NetworkInterface", client.ObjectKeyFromObject(nic), "Node", node.Name, "Label", nic.Labels[LabelKeyClusterName])
 		if err := o.onmetalClient.Patch(ctx, nic, client.MergeFrom(nicBase)); err != nil {
 			return nil, fmt.Errorf("failed to patch NetworkInterface %s for Node %s: %w", client.ObjectKeyFromObject(nic), node.Name, err)
 		}
