@@ -20,9 +20,8 @@ import (
 	"strings"
 	"time"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
@@ -87,7 +86,30 @@ func (o *onmetalLoadBalancer) GetLoadBalancerName(ctx context.Context, clusterNa
 func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	klog.V(2).InfoS("EnsureLoadBalancer for Service", "Cluster", clusterName, "Service", client.ObjectKeyFromObject(service))
 
+	// decide load balancer type based on service annotation for internal load balancer
+	var desiredLoadBalancerType networkingv1alpha1.LoadBalancerType
+	if value, ok := service.Annotations[InternalLoadBalancerAnnotation]; ok && value == "true" {
+		desiredLoadBalancerType = networkingv1alpha1.LoadBalancerTypeInternal
+	} else {
+		desiredLoadBalancerType = networkingv1alpha1.LoadBalancerTypePublic
+	}
+
 	loadBalancerName := getLoadBalancerNameForService(clusterName, service)
+
+	// if existing load balancer type is different than desired load balancer
+	// type then delete existing load balancer
+	existingLoadBalancer := &networkingv1alpha1.LoadBalancer{}
+	if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: loadBalancerName}, existingLoadBalancer); err == nil {
+		existingLoadBalancerType := existingLoadBalancer.Spec.Type
+		if existingLoadBalancerType != desiredLoadBalancerType {
+			klog.V(2).InfoS("Deleting existing LoadBalancer %s", loadBalancerName)
+			if err = o.EnsureLoadBalancerDeleted(ctx, clusterName, service); err != nil {
+				return nil, fmt.Errorf("failed deleting existing loadbalancer %s: %w", loadBalancerName, err)
+			}
+			klog.V(2).InfoS("Deleted existing LoadBalancer %s", loadBalancerName)
+		}
+	}
+
 	klog.V(2).InfoS("Getting LoadBalancer ports from Service", "Service", client.ObjectKeyFromObject(service))
 	var lbPorts []networkingv1alpha1.LoadBalancerPort
 	for _, svcPort := range service.Spec.Ports {
@@ -113,7 +135,7 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 			},
 		},
 		Spec: networkingv1alpha1.LoadBalancerSpec{
-			Type:       networkingv1alpha1.LoadBalancerTypePublic,
+			Type:       desiredLoadBalancerType,
 			IPFamilies: service.Spec.IPFamilies,
 			NetworkRef: v1.LocalObjectReference{
 				Name: o.cloudConfig.NetworkName,
@@ -122,11 +144,11 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 		},
 	}
 
-	if value, ok := service.Annotations[InternalLoadBalancerAnnotation]; ok && value == "true" {
+	// if load balancer type is Internal then update IPSource with valid prefix template
+	if desiredLoadBalancerType == networkingv1alpha1.LoadBalancerTypeInternal {
 		if o.cloudConfig.PrefixName == "" {
 			return nil, fmt.Errorf("prefixName is not defined in config")
 		}
-		loadBalancer.Spec.Type = networkingv1alpha1.LoadBalancerTypeInternal
 		loadBalancer.Spec.IPs = []networkingv1alpha1.IPSource{
 			{
 				Ephemeral: &networkingv1alpha1.EphemeralPrefixSource{
