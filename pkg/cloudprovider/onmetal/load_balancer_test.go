@@ -289,9 +289,7 @@ var _ = Describe("LoadBalancer", func() {
 		})).Should(Succeed())
 
 		By("ensuring load balancer for service")
-		lbCtx, cancel = context.WithTimeout(ctx, 1*time.Second)
-		defer cancel()
-		Expect(lbProvider.EnsureLoadBalancer(lbCtx, clusterName, service, []*corev1.Node{node})).Error().To(HaveOccurred())
+		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().NotTo(HaveOccurred())
 
 		By("patching public IP into LoadBalancer status")
 		Eventually(UpdateStatus(loadBalancer, func() {
