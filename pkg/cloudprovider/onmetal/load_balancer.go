@@ -102,6 +102,11 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 	var existingLoadBalancerType networkingv1alpha1.LoadBalancerType
 	if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: loadBalancerName}, existingLoadBalancer); err == nil {
 		existingLoadBalancerType = existingLoadBalancer.Spec.Type
+		if existingLoadBalancerType != desiredLoadBalancerType {
+			if err = o.EnsureLoadBalancerDeleted(ctx, clusterName, service); err != nil {
+				return nil, fmt.Errorf("failed deleting existing loadbalancer %s: %w", loadBalancerName, err)
+			}
+		}
 	}
 
 	klog.V(2).InfoS("Getting LoadBalancer ports from Service", "Service", client.ObjectKeyFromObject(service))
