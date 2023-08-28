@@ -177,7 +177,7 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNam
 	}
 	klog.V(2).InfoS("Applied LoadBalancerRouting for LoadBalancer", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
 
-	lbStatus, err := waitLoadBalancerActive(ctx, existingLoadBalancerType, service, o.onmetalClient, loadBalancer)
+	lbStatus, err := waitLoadBalancerActive(ctx, o.onmetalClient, existingLoadBalancerType, service, loadBalancer)
 	if err != nil {
 		return nil, err
 	}
@@ -189,9 +189,9 @@ func getLoadBalancerNameForService(clusterName string, service *v1.Service) stri
 	return fmt.Sprintf("%s-%s-%s", clusterName, service.Name, nameSuffix)
 }
 
-func waitLoadBalancerActive(ctx context.Context, existingLoadBalancerType networkingv1alpha1.LoadBalancerType, service *v1.Service,
-	onmetalClient client.Client, loadBalancer *networkingv1alpha1.LoadBalancer) (v1.LoadBalancerStatus, error) {
-	klog.V(2).InfoS("Waiting for onmetal LoadBalancer to become ready", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
+func waitLoadBalancerActive(ctx context.Context, onmetalClient client.Client, existingLoadBalancerType networkingv1alpha1.LoadBalancerType,
+	service *v1.Service, loadBalancer *networkingv1alpha1.LoadBalancer) (v1.LoadBalancerStatus, error) {
+	klog.V(2).InfoS("Waiting for LoadBalancer instance to become ready", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
 	backoff := wait.Backoff{
 		Duration: waitLoadbalancerInitDelay,
 		Factor:   waitLoadbalancerFactor,
@@ -199,30 +199,28 @@ func waitLoadBalancerActive(ctx context.Context, existingLoadBalancerType networ
 	}
 
 	loadBalancerStatus := v1.LoadBalancerStatus{}
-	err := wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
-		err := onmetalClient.Get(ctx, client.ObjectKey{Namespace: loadBalancer.Namespace, Name: loadBalancer.Name}, loadBalancer)
-		if err == nil {
-			lbIngress := []v1.LoadBalancerIngress{}
-			for _, ipAddr := range loadBalancer.Status.IPs {
-				lbIngress = append(lbIngress, v1.LoadBalancerIngress{IP: ipAddr.String()})
-			}
-			loadBalancerStatus.Ingress = lbIngress
-
-			if loadBalancer.Spec.Type != existingLoadBalancerType && servicehelper.LoadBalancerStatusEqual(&service.Status.LoadBalancer, &loadBalancerStatus) {
-				return false, nil
-			}
-			if len(loadBalancer.Status.IPs) > 0 {
-				return true, nil
-			}
+	if err := wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
+		if err := onmetalClient.Get(ctx, client.ObjectKey{Namespace: loadBalancer.Namespace, Name: loadBalancer.Name}, loadBalancer); err != nil {
+			return false, err
 		}
-		return false, err
-	})
+		if len(loadBalancer.Status.IPs) == 0 {
+			return false, nil
+		}
+		lbIngress := []v1.LoadBalancerIngress{}
+		for _, ipAddr := range loadBalancer.Status.IPs {
+			lbIngress = append(lbIngress, v1.LoadBalancerIngress{IP: ipAddr.String()})
+		}
+		loadBalancerStatus.Ingress = lbIngress
 
-	if wait.Interrupted(err) {
-		return loadBalancerStatus, fmt.Errorf("timeout waiting for the onmetal LoadBalancer %s to become ready", client.ObjectKeyFromObject(loadBalancer))
+		if loadBalancer.Spec.Type != existingLoadBalancerType && servicehelper.LoadBalancerStatusEqual(&service.Status.LoadBalancer, &loadBalancerStatus) {
+			return false, nil
+		}
+		return true, nil
+	}); wait.Interrupted(err) {
+		return loadBalancerStatus, fmt.Errorf("timeout waiting for the LoadBalancer %s to become ready", client.ObjectKeyFromObject(loadBalancer))
 	}
 
-	klog.V(2).InfoS("onmetal LoadBalancer became ready", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
+	klog.V(2).InfoS("LoadBalancer became ready", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
 	return loadBalancerStatus, nil
 }
 
@@ -359,30 +357,26 @@ func (o *onmetalLoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clu
 	if err := waitForDeletingLoadBalancer(ctx, service, o.onmetalClient, loadBalancer); err != nil {
 		return err
 	}
-	klog.V(2).InfoS("Deleted LoadBalancer", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
 	return nil
 }
 
 func waitForDeletingLoadBalancer(ctx context.Context, service *v1.Service, onmetalClient client.Client, loadBalancer *networkingv1alpha1.LoadBalancer) error {
-	klog.V(2).InfoS("Waiting for onmetal LoadBalancer to be deleted", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
+	klog.V(2).InfoS("Waiting for LoadBalancer instance to be deleted", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
 	backoff := wait.Backoff{
 		Duration: waitLoadbalancerInitDelay,
 		Factor:   waitLoadbalancerFactor,
 		Steps:    waitLoadbalancerActiveSteps,
 	}
 
-	err := wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
-		err := onmetalClient.Get(ctx, client.ObjectKey{Namespace: loadBalancer.Namespace, Name: loadBalancer.Name}, loadBalancer)
-		if apierrors.IsNotFound(err) {
-			return true, nil
+	if err := wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
+		if err := onmetalClient.Get(ctx, client.ObjectKey{Namespace: loadBalancer.Namespace, Name: loadBalancer.Name}, loadBalancer); !apierrors.IsNotFound(err) {
+			return false, err
 		}
-		return false, err
-	})
-
-	if wait.Interrupted(err) {
-		return fmt.Errorf("timeout waiting for the onmetal LoadBalancer %s to be deleted", client.ObjectKeyFromObject(loadBalancer))
+		return true, nil
+	}); wait.Interrupted(err) {
+		return fmt.Errorf("timeout waiting for the LoadBalancer %s to be deleted", client.ObjectKeyFromObject(loadBalancer))
 	}
 
-	klog.V(2).InfoS("Deleted onmetal LoadBalancer", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
+	klog.V(2).InfoS("Deleted LoadBalancer", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
 	return nil
 }
