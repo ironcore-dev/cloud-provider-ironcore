@@ -15,15 +15,13 @@
 package main
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/onmetal/cloud-provider-onmetal/pkg/cloudprovider/onmetal"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
 	cloudcontrollerconfig "k8s.io/cloud-provider/app/config"
+	"k8s.io/cloud-provider/names"
 	"k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
@@ -46,11 +44,12 @@ func main() {
 
 	onmetal.AddExtraFlags(pflag.CommandLine)
 
-	command := app.NewCloudControllerManagerCommand(opts, cloudInitializer, controllerInitializers, namedFlagSets, wait.NeverStop)
+	controllerAliases := names.CCMControllerAliases()
+
+	command := app.NewCloudControllerManagerCommand(opts, cloudInitializer, controllerInitializers, controllerAliases, namedFlagSets, wait.NeverStop)
 
 	if err := command.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
+		klog.Fatalf("unable to execute command: %v", err)
 	}
 }
 

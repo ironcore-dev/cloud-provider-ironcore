@@ -20,6 +20,8 @@ import (
 	"io"
 	"log"
 
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -57,7 +59,9 @@ func init() {
 
 		onmetalCluster, err := cluster.New(cfg.RestConfig, func(o *cluster.Options) {
 			o.Scheme = onmetalScheme
-			o.Cache.Namespaces = []string{cfg.Namespace}
+			o.Cache.DefaultNamespaces = map[string]cache.Config{
+				cfg.Namespace: {},
+			}
 		})
 		if err != nil {
 			return nil, fmt.Errorf("unable to create onmetal cluster: %w", err)
