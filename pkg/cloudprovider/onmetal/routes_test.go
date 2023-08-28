@@ -75,7 +75,6 @@ var _ = Describe("Routes", func() {
 	})
 
 	It("should list Routes for all network interfaces in current network", func(ctx SpecContext) {
-
 		By("patching the machine with cluster name label")
 		baseMachine := machine.DeepCopy()
 		machine.ObjectMeta.Labels = map[string]string{LabelKeyClusterName: clusterName}
@@ -234,7 +233,6 @@ var _ = Describe("Routes", func() {
 	})
 
 	It("should not list routes for network interface not having cluster name label", func(ctx SpecContext) {
-
 		By("creating a network interface for machine without cluster label")
 		networkInterface := &networkingv1alpha1.NetworkInterface{
 			ObjectMeta: metav1.ObjectMeta{
@@ -301,7 +299,6 @@ var _ = Describe("Routes", func() {
 	})
 
 	It("should ensure that a prefix has been created for a route", func(ctx SpecContext) {
-
 		By("patching the machine with cluster name label")
 		baseMachine := machine.DeepCopy()
 		machine.ObjectMeta.Labels = map[string]string{LabelKeyClusterName: clusterName}
