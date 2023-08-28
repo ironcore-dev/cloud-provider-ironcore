@@ -3,7 +3,7 @@ module github.com/onmetal/cloud-provider-onmetal
 go 1.20
 
 require (
-	github.com/onmetal/controller-utils v0.8.0
+	github.com/onmetal/controller-utils v0.8.1
 	github.com/onmetal/onmetal-api v0.1.2-0.20230530094909-67f87469764c
 	github.com/onsi/ginkgo/v2 v2.12.0
 	github.com/onsi/gomega v1.27.10
