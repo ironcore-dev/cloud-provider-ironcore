@@ -114,7 +114,7 @@ func (o onmetalRoutes) CreateRoute(ctx context.Context, clusterName string, name
 				// if the interface is found, add the prefix to the network interface
 				if interfaceFound {
 					// get the network interface object
-					networkInterfaceName := fmt.Sprintf("%s-%s", machine.Name, networkInterface.Name)
+					networkInterfaceName := getNetworkInterfaceName(machine, networkInterface)
 					nic := &networkingv1alpha1.NetworkInterface{}
 					if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: networkInterfaceName}, nic); err != nil {
 						return err
