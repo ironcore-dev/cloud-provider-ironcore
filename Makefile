@@ -71,8 +71,8 @@ ADDLICENSE ?= $(LOCALBIN)/addlicense
 GOIMPORTS ?= $(LOCALBIN)/goimports
 
 ## Tool Versions
-ADDLICENSE_VERSION ?= v1.1.0
-GOIMPORTS_VERSION ?= v0.5.0
+ADDLICENSE_VERSION ?= v1.1.1
+GOIMPORTS_VERSION ?= v0.13.0
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
