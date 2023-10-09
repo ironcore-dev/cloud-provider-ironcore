@@ -99,6 +99,7 @@ var _ = Describe("Routes", func() {
 					Name: machine.Name,
 					UID:  machine.UID,
 				},
+				ProviderID: "foo://bar",
 			},
 		}
 		Expect(k8sClient.Create(ctx, staticNetworkInterface)).To(Succeed())
@@ -151,14 +152,12 @@ var _ = Describe("Routes", func() {
 		By("patching the static network interface status to indicate availability and correct binding")
 		staticNetworkInterfaceBase := staticNetworkInterface.DeepCopy()
 		staticNetworkInterface.Status.State = networkingv1alpha1.NetworkInterfaceStateAvailable
-		staticNetworkInterface.Status.Phase = networkingv1alpha1.NetworkInterfacePhaseBound
 		staticNetworkInterface.Status.Prefixes = []commonv1alpha1.IPPrefix{commonv1alpha1.MustParseIPPrefix("100.0.0.1/24")}
 		Expect(k8sClient.Status().Patch(ctx, staticNetworkInterface, client.MergeFrom(staticNetworkInterfaceBase))).To(Succeed())
 
 		By("patching the ephemeral network interface status to indicate availability and correct binding")
 		ephemeralNetworkInterfaceBase := ephemeralNetworkInterface.DeepCopy()
 		ephemeralNetworkInterface.Status.State = networkingv1alpha1.NetworkInterfaceStateAvailable
-		ephemeralNetworkInterface.Status.Phase = networkingv1alpha1.NetworkInterfacePhaseBound
 		ephemeralNetworkInterface.Status.Prefixes = []commonv1alpha1.IPPrefix{commonv1alpha1.MustParseIPPrefix("192.168.0.1/32")}
 		Expect(k8sClient.Status().Patch(ctx, ephemeralNetworkInterface, client.MergeFrom(ephemeralNetworkInterfaceBase))).To(Succeed())
 
@@ -185,14 +184,12 @@ var _ = Describe("Routes", func() {
 		machine.Status.State = computev1alpha1.MachineStateRunning
 		machine.Status.NetworkInterfaces = []computev1alpha1.NetworkInterfaceStatus{
 			{
-				Name:  "primary",
-				Phase: computev1alpha1.NetworkInterfacePhaseBound,
-				IPs:   []commonv1alpha1.IP{commonv1alpha1.MustParseIP("100.0.0.1")},
+				Name: "primary",
+				IPs:  []commonv1alpha1.IP{commonv1alpha1.MustParseIP("100.0.0.1")},
 			},
 			{
-				Name:  "ephemeral",
-				Phase: computev1alpha1.NetworkInterfacePhaseBound,
-				IPs:   []commonv1alpha1.IP{commonv1alpha1.MustParseIP("192.168.0.1")},
+				Name: "ephemeral",
+				IPs:  []commonv1alpha1.IP{commonv1alpha1.MustParseIP("192.168.0.1")},
 			},
 		}
 		Expect(k8sClient.Patch(ctx, machine, client.MergeFrom(machineBase))).To(Succeed())
@@ -251,6 +248,7 @@ var _ = Describe("Routes", func() {
 					Name: machine.Name,
 					UID:  machine.UID,
 				},
+				ProviderID: "foo://bar",
 			},
 		}
 		Expect(k8sClient.Create(ctx, networkInterface)).To(Succeed())
@@ -269,7 +267,6 @@ var _ = Describe("Routes", func() {
 		By("patching the network interface status to indicate availability and correct binding")
 		networkInterfaceBase := networkInterface.DeepCopy()
 		networkInterface.Status.State = networkingv1alpha1.NetworkInterfaceStateAvailable
-		networkInterface.Status.Phase = networkingv1alpha1.NetworkInterfacePhaseBound
 		networkInterface.Status.Prefixes = []commonv1alpha1.IPPrefix{commonv1alpha1.MustParseIPPrefix("100.0.0.1/24")}
 		Expect(k8sClient.Status().Patch(ctx, networkInterface, client.MergeFrom(networkInterfaceBase))).To(Succeed())
 
@@ -287,9 +284,8 @@ var _ = Describe("Routes", func() {
 		}
 		machine.Status.State = computev1alpha1.MachineStateRunning
 		machine.Status.NetworkInterfaces = []computev1alpha1.NetworkInterfaceStatus{{
-			Name:  "primary",
-			Phase: computev1alpha1.NetworkInterfacePhaseBound,
-			IPs:   []commonv1alpha1.IP{commonv1alpha1.MustParseIP("100.0.0.1")},
+			Name: "primary",
+			IPs:  []commonv1alpha1.IP{commonv1alpha1.MustParseIP("100.0.0.1")},
 		}}
 		Expect(k8sClient.Patch(ctx, machine, client.MergeFrom(machineBase))).To(Succeed())
 
@@ -320,6 +316,7 @@ var _ = Describe("Routes", func() {
 					Name: machine.Name,
 					UID:  machine.UID,
 				},
+				ProviderID: "foo://bar",
 			},
 		}
 		Expect(k8sClient.Create(ctx, staticNetworkInterface)).To(Succeed())
@@ -372,13 +369,11 @@ var _ = Describe("Routes", func() {
 		By("patching the static network interface status to indicate availability and correct binding")
 		staticNetworkInterfaceBase := staticNetworkInterface.DeepCopy()
 		staticNetworkInterface.Status.State = networkingv1alpha1.NetworkInterfaceStateAvailable
-		staticNetworkInterface.Status.Phase = networkingv1alpha1.NetworkInterfacePhaseBound
 		Expect(k8sClient.Status().Patch(ctx, staticNetworkInterface, client.MergeFrom(staticNetworkInterfaceBase))).To(Succeed())
 
 		By("patching the ephemeral network interface status to indicate availability and correct binding")
 		ephemeralNetworkInterfaceBase := ephemeralNetworkInterface.DeepCopy()
 		ephemeralNetworkInterface.Status.State = networkingv1alpha1.NetworkInterfaceStateAvailable
-		ephemeralNetworkInterface.Status.Phase = networkingv1alpha1.NetworkInterfacePhaseBound
 		Expect(k8sClient.Status().Patch(ctx, ephemeralNetworkInterface, client.MergeFrom(ephemeralNetworkInterfaceBase))).To(Succeed())
 
 		By("patching the machine status to have a valid internal IP address")
@@ -404,14 +399,12 @@ var _ = Describe("Routes", func() {
 		machine.Status.State = computev1alpha1.MachineStateRunning
 		machine.Status.NetworkInterfaces = []computev1alpha1.NetworkInterfaceStatus{
 			{
-				Name:  "primary",
-				Phase: computev1alpha1.NetworkInterfacePhaseBound,
-				IPs:   []commonv1alpha1.IP{commonv1alpha1.MustParseIP("100.0.0.1")},
+				Name: "primary",
+				IPs:  []commonv1alpha1.IP{commonv1alpha1.MustParseIP("100.0.0.1")},
 			},
 			{
-				Name:  "ephemeral",
-				Phase: computev1alpha1.NetworkInterfacePhaseBound,
-				IPs:   []commonv1alpha1.IP{commonv1alpha1.MustParseIP("192.168.0.1")},
+				Name: "ephemeral",
+				IPs:  []commonv1alpha1.IP{commonv1alpha1.MustParseIP("192.168.0.1")},
 			},
 		}
 		Expect(k8sClient.Patch(ctx, machine, client.MergeFrom(machineBase))).To(Succeed())
