@@ -225,7 +225,7 @@ func waitLoadBalancerActive(ctx context.Context, onmetalClient client.Client, ex
 }
 
 func (o *onmetalLoadBalancer) applyLoadBalancerRoutingForLoadBalancer(ctx context.Context, loadBalancer *networkingv1alpha1.LoadBalancer, nodes []*v1.Node) error {
-	networkInterfaces, err := o.getNetworkInterfacesForNodes(ctx, nodes, loadBalancer.Spec.NetworkRef.Name)
+	loadBalacerDestinations, err := o.getLoadBalancerDestinationsForNodes(ctx, nodes, loadBalancer.Spec.NetworkRef.Name)
 	if err != nil {
 		return fmt.Errorf("failed to get NetworkInterfaces for Nodes: %w", err)
 	}
@@ -249,7 +249,7 @@ func (o *onmetalLoadBalancer) applyLoadBalancerRoutingForLoadBalancer(ctx contex
 			Name: network.Name,
 			UID:  network.UID,
 		},
-		Destinations: networkInterfaces,
+		Destinations: loadBalacerDestinations,
 	}
 
 	if err := controllerutil.SetOwnerReference(loadBalancer, loadBalancerRouting, o.onmetalClient.Scheme()); err != nil {
@@ -262,8 +262,8 @@ func (o *onmetalLoadBalancer) applyLoadBalancerRoutingForLoadBalancer(ctx contex
 	return nil
 }
 
-func (o *onmetalLoadBalancer) getNetworkInterfacesForNodes(ctx context.Context, nodes []*v1.Node, networkName string) ([]commonv1alpha1.LocalUIDReference, error) {
-	var networkInterfaces []commonv1alpha1.LocalUIDReference
+func (o *onmetalLoadBalancer) getLoadBalancerDestinationsForNodes(ctx context.Context, nodes []*v1.Node, networkName string) ([]networkingv1alpha1.LoadBalancerDestination, error) {
+	var loadbalancerDestinations []networkingv1alpha1.LoadBalancerDestination
 	for _, node := range nodes {
 		machineName := extractMachineNameFromProviderID(node.Spec.ProviderID)
 		machine := &computev1alpha1.Machine{}
@@ -273,7 +273,6 @@ func (o *onmetalLoadBalancer) getNetworkInterfacesForNodes(ctx context.Context, 
 
 		for _, machineNIC := range machine.Spec.NetworkInterfaces {
 			networkInterface := &networkingv1alpha1.NetworkInterface{}
-
 			networkInterfaceName := fmt.Sprintf("%s-%s", machine.Name, machineNIC.Name)
 
 			if machineNIC.NetworkInterfaceRef != nil {
@@ -284,15 +283,25 @@ func (o *onmetalLoadBalancer) getNetworkInterfacesForNodes(ctx context.Context, 
 				return nil, fmt.Errorf("failed to get network interface %s for machine %s: %w", client.ObjectKeyFromObject(networkInterface), client.ObjectKeyFromObject(machine), err)
 			}
 
-			if networkInterface.Spec.NetworkRef.Name == networkName {
-				networkInterfaces = append(networkInterfaces, commonv1alpha1.LocalUIDReference{
-					Name: networkInterface.Name,
-					UID:  networkInterface.UID,
+			// If the NetworkInterface is not part of Network we continue
+			if networkInterface.Spec.NetworkRef.Name != networkName {
+				continue
+			}
+
+			// Create a LoadBalancerDestination for every NetworkInterface IP
+			for _, nicIP := range networkInterface.Status.IPs {
+				loadbalancerDestinations = append(loadbalancerDestinations, networkingv1alpha1.LoadBalancerDestination{
+					IP: nicIP,
+					TargetRef: &networkingv1alpha1.LoadBalancerTargetRef{
+						UID:        networkInterface.UID,
+						Name:       networkInterface.Name,
+						ProviderID: networkInterface.Spec.ProviderID,
+					},
 				})
 			}
 		}
 	}
-	return networkInterfaces, nil
+	return loadbalancerDestinations, nil
 }
 
 func extractMachineNameFromProviderID(providerID string) string {
@@ -323,12 +332,12 @@ func (o *onmetalLoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterNam
 	}
 
 	klog.V(2).InfoS("Updating LoadBalancerRouting destinations for LoadBalancer", "LoadBalancerRouting", client.ObjectKeyFromObject(loadBalancerRouting), "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
-	networkInterfaces, err := o.getNetworkInterfacesForNodes(ctx, nodes, loadBalancer.Spec.NetworkRef.Name)
+	loadBalancerDestinations, err := o.getLoadBalancerDestinationsForNodes(ctx, nodes, loadBalancer.Spec.NetworkRef.Name)
 	if err != nil {
 		return fmt.Errorf("failed to get NetworkInterfaces for LoadBalancer %s: %w", client.ObjectKeyFromObject(loadBalancer), err)
 	}
 	loadBalancerRoutingBase := loadBalancerRouting.DeepCopy()
-	loadBalancerRouting.Destinations = networkInterfaces
+	loadBalancerRouting.Destinations = loadBalancerDestinations
 
 	if err := o.onmetalClient.Patch(ctx, loadBalancerRouting, client.MergeFrom(loadBalancerRoutingBase)); err != nil {
 		return fmt.Errorf("failed to patch LoadBalancerRouting %s for LoadBalancer %s: %w", client.ObjectKeyFromObject(loadBalancerRouting), client.ObjectKeyFromObject(loadBalancer), err)

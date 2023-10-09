@@ -72,6 +72,7 @@ var _ = Describe("InstancesV2", func() {
 			Spec: networkingv1alpha1.NetworkInterfaceSpec{
 				NetworkRef: corev1.LocalObjectReference{Name: network.Name},
 				IPs:        []networkingv1alpha1.IPSource{{Value: commonv1alpha1.MustParseNewIP("10.0.0.1")}},
+				ProviderID: "foo://bar",
 				VirtualIP: &networkingv1alpha1.VirtualIPSource{
 					Ephemeral: &networkingv1alpha1.EphemeralVirtualIPSource{
 						VirtualIPTemplate: &networkingv1alpha1.VirtualIPTemplateSpec{
@@ -97,7 +98,6 @@ var _ = Describe("InstancesV2", func() {
 		machine.Status.State = computev1alpha1.MachineStateRunning
 		machine.Status.NetworkInterfaces = []computev1alpha1.NetworkInterfaceStatus{{
 			Name:      "my-nic",
-			Phase:     computev1alpha1.NetworkInterfacePhaseBound,
 			IPs:       []commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.1")},
 			VirtualIP: &commonv1alpha1.IP{Addr: netip.MustParseAddr("10.0.0.10")},
 		}}
