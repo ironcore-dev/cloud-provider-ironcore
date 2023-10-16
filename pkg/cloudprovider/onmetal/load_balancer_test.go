@@ -15,9 +15,7 @@
 package onmetal
 
 import (
-	"context"
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -138,21 +136,22 @@ var _ = Describe("LoadBalancer", func() {
 		Expect(k8sClient.Create(ctx, service)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, service)
 
-		By("ensuring load balancer for service")
-		lbCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		defer cancel()
-		Expect(lbProvider.EnsureLoadBalancer(lbCtx, clusterName, service, []*corev1.Node{node})).Error().To(HaveOccurred())
-
-		By("patching public IP into load balancer status")
+		// Start a goroutine to patch public IP into load banacer status in order to succeed EnsureLoadBalancer call
 		loadBalancer := &networkingv1alpha1.LoadBalancer{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
 				Name:      lbProvider.GetLoadBalancerName(ctx, clusterName, service),
 			},
 		}
-		Eventually(UpdateStatus(loadBalancer, func() {
-			loadBalancer.Status.IPs = []commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.1")}
-		})).Should(Succeed())
+		go func() {
+			By("patching public IP into load balancer status")
+			Eventually(UpdateStatus(loadBalancer, func() {
+				loadBalancer.Status.IPs = []commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.1")}
+			})).Should(Succeed())
+		}()
+
+		By("ensuring load balancer for service")
+		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().To(BeNil())
 
 		By("ensuring the load balancer type is public and load balancer status has public IP")
 		Eventually(Object(loadBalancer)).Should(SatisfyAll(
@@ -284,21 +283,22 @@ var _ = Describe("LoadBalancer", func() {
 		Expect(k8sClient.Create(ctx, service)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, service)
 
-		By("ensuring load balancer for service")
-		lbCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
-		defer cancel()
-		Expect(lbProvider.EnsureLoadBalancer(lbCtx, clusterName, service, []*corev1.Node{node})).Error().To(HaveOccurred())
-
-		By("patching internal IP in load balancer status")
+		// Start a goroutine to patch internal IP into load banacer status in order to succeed EnsureLoadBalancer call
 		loadBalancer := &networkingv1alpha1.LoadBalancer{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
 				Name:      lbProvider.GetLoadBalancerName(ctx, clusterName, service),
 			},
 		}
-		Eventually(UpdateStatus(loadBalancer, func() {
-			loadBalancer.Status.IPs = []commonv1alpha1.IP{commonv1alpha1.MustParseIP("100.0.0.10")}
-		})).Should(Succeed())
+		go func() {
+			By("patching internal IP into load balancer status")
+			Eventually(UpdateStatus(loadBalancer, func() {
+				loadBalancer.Status.IPs = []commonv1alpha1.IP{commonv1alpha1.MustParseIP("100.0.0.10")}
+			})).Should(Succeed())
+		}()
+
+		By("ensuring load balancer for service")
+		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().To(BeNil())
 
 		By("ensuring the load balancer type is internal and load balancer status has internal IP")
 		Eventually(Object(loadBalancer)).Should(SatisfyAll(
@@ -310,15 +310,16 @@ var _ = Describe("LoadBalancer", func() {
 			service.Annotations = map[string]string{}
 		})).Should(Succeed())
 
-		By("ensuring load balancer for service")
-		lbCtx, cancel = context.WithTimeout(ctx, 5*time.Second)
-		defer cancel()
-		Expect(lbProvider.EnsureLoadBalancer(lbCtx, clusterName, service, []*corev1.Node{node})).Error().To(HaveOccurred())
+		// Start a goroutine to patch public IP into load banacer status in order to succeed EnsureLoadBalancer call
+		go func() {
+			By("patching public IP into LoadBalancer status")
+			Eventually(UpdateStatus(loadBalancer, func() {
+				loadBalancer.Status.IPs = []commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.1")}
+			})).Should(Succeed())
+		}()
 
-		By("patching public IP into LoadBalancer status")
-		Eventually(UpdateStatus(loadBalancer, func() {
-			loadBalancer.Status.IPs = []commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.1")}
-		})).Should(Succeed())
+		By("ensuring load balancer for service")
+		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().To(BeNil())
 
 		By("ensuring the load balancer type is public and load balancer status has public IP")
 		Eventually(Object(loadBalancer)).Should(SatisfyAll(
@@ -485,21 +486,22 @@ var _ = Describe("LoadBalancer", func() {
 		Expect(k8sClient.Create(ctx, service)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, service)
 
-		By("ensuring load balancer for service")
-		ensureCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
-		defer cancel()
-		Expect(lbProvider.EnsureLoadBalancer(ensureCtx, clusterName, service, []*corev1.Node{node})).Error().To(HaveOccurred())
-
-		By("patching public IP in load balancer status")
+		// Start a goroutine to patch public IP into load banacer status in order to succeed EnsureLoadBalancer call
 		loadBalancer := &networkingv1alpha1.LoadBalancer{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
 				Name:      lbProvider.GetLoadBalancerName(ctx, clusterName, service),
 			},
 		}
-		Eventually(UpdateStatus(loadBalancer, func() {
-			loadBalancer.Status.IPs = []commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.1")}
-		})).Should(Succeed())
+		go func() {
+			By("patching public IP into load balancer status")
+			Eventually(UpdateStatus(loadBalancer, func() {
+				loadBalancer.Status.IPs = []commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.1")}
+			})).Should(Succeed())
+		}()
+
+		By("ensuring load balancer for service")
+		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().To(BeNil())
 
 		By("ensuring the load balancer type is public and load balancer status has public IP")
 		Eventually(Object(loadBalancer)).Should(SatisfyAll(
