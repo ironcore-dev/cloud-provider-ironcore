@@ -144,6 +144,7 @@ var _ = Describe("LoadBalancer", func() {
 			},
 		}
 		go func() {
+			defer GinkgoRecover()
 			By("patching public IP into load balancer status")
 			Eventually(UpdateStatus(loadBalancer, func() {
 				loadBalancer.Status.IPs = []commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.1")}
@@ -291,6 +292,7 @@ var _ = Describe("LoadBalancer", func() {
 			},
 		}
 		go func() {
+			defer GinkgoRecover()
 			By("patching internal IP into load balancer status")
 			Eventually(UpdateStatus(loadBalancer, func() {
 				loadBalancer.Status.IPs = []commonv1alpha1.IP{commonv1alpha1.MustParseIP("100.0.0.10")}
@@ -312,6 +314,7 @@ var _ = Describe("LoadBalancer", func() {
 
 		// Start a goroutine to patch public IP into load banacer status in order to succeed EnsureLoadBalancer call
 		go func() {
+			defer GinkgoRecover()
 			By("patching public IP into LoadBalancer status")
 			Eventually(UpdateStatus(loadBalancer, func() {
 				loadBalancer.Status.IPs = []commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.1")}
@@ -494,6 +497,7 @@ var _ = Describe("LoadBalancer", func() {
 			},
 		}
 		go func() {
+			defer GinkgoRecover()
 			By("patching public IP into load balancer status")
 			Eventually(UpdateStatus(loadBalancer, func() {
 				loadBalancer.Status.IPs = []commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.1")}
