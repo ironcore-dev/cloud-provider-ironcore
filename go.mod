@@ -6,7 +6,7 @@ require (
 	github.com/onmetal/controller-utils v0.8.2
 	github.com/onmetal/onmetal-api v0.1.2-0.20231006124132-8ad37e778d15
 	github.com/onsi/ginkgo/v2 v2.13.0
-	github.com/onsi/gomega v1.28.1
+	github.com/onsi/gomega v1.29.0
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/pflag v1.0.5
 	k8s.io/api v0.28.3
