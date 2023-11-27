@@ -20,8 +20,9 @@ all: compile
 compile: fmt vet
 	go build -o dist/$(BIN_NAME) cmd/$(BIN_NAME)/main.go
 
-lint: ## Run golangci-lint against code.
-		golangci-lint run ./...
+.PHONY: lint
+lint: golangci-lint ## Run golangci-lint on the code.
+	$(GOLANGCI_LINT) run ./...
 
 .PHONY: add-license
 add-license: addlicense ## Add license headers to all go files.
@@ -68,10 +69,12 @@ $(LOCALBIN):
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 ADDLICENSE ?= $(LOCALBIN)/addlicense
 GOIMPORTS ?= $(LOCALBIN)/goimports
+GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint
 
 ## Tool Versions
 ADDLICENSE_VERSION ?= v1.1.1
 GOIMPORTS_VERSION ?= v0.13.0
+GOLANGCI_LINT_VERSION ?= v1.55.2
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
@@ -87,3 +90,8 @@ $(ADDLICENSE): $(LOCALBIN)
 goimports: $(GOIMPORTS) ## Download goimports locally if necessary.
 $(GOIMPORTS): $(LOCALBIN)
 	test -s $(LOCALBIN)/goimports || GOBIN=$(LOCALBIN) go install golang.org/x/tools/cmd/goimports@$(GOIMPORTS_VERSION)
+
+.PHONY: golangci-lint
+golangci-lint: $(GOLANGCI_LINT) ## Download golangci-lint locally if necessary.
+$(GOLANGCI_LINT): $(LOCALBIN)
+	test -s $(LOCALBIN)/golangci-lint || GOBIN=$(LOCALBIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
