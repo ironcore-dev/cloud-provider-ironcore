@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package onmetal
+package ironcore
 
 import (
 	"fmt"
@@ -40,11 +40,11 @@ type CloudConfig struct {
 }
 
 var (
-	OnmetalKubeconfigPath string
+	IroncoreKubeconfigPath string
 )
 
 func AddExtraFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&OnmetalKubeconfigPath, "onmetal-kubeconfig", "", "Path to the onmetal kubeconfig.")
+	fs.StringVar(&IroncoreKubeconfigPath, "ironcore-kubeconfig", "", "Path to the ironcore kubeconfig.")
 }
 
 func LoadCloudProviderConfig(f io.Reader) (*cloudProviderConfig, error) {
@@ -67,31 +67,31 @@ func LoadCloudProviderConfig(f io.Reader) (*cloudProviderConfig, error) {
 		return nil, fmt.Errorf("clusterName missing in cloud config")
 	}
 
-	onmetalKubeconfigData, err := os.ReadFile(OnmetalKubeconfigPath)
+	ironcoreKubeconfigData, err := os.ReadFile(IroncoreKubeconfigPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read onmetal kubeconfig %s: %w", OnmetalKubeconfigPath, err)
+		return nil, fmt.Errorf("failed to read ironcore kubeconfig %s: %w", IroncoreKubeconfigPath, err)
 	}
 
-	onmetalKubeconfig, err := clientcmd.Load(onmetalKubeconfigData)
+	ironcoreKubeconfig, err := clientcmd.Load(ironcoreKubeconfigData)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read onmetal cluster kubeconfig: %w", err)
+		return nil, fmt.Errorf("unable to read ironcore cluster kubeconfig: %w", err)
 	}
-	clientConfig := clientcmd.NewDefaultClientConfig(*onmetalKubeconfig, nil)
+	clientConfig := clientcmd.NewDefaultClientConfig(*ironcoreKubeconfig, nil)
 	if err != nil {
-		return nil, fmt.Errorf("unable to serialize onmetal cluster kubeconfig: %w", err)
+		return nil, fmt.Errorf("unable to serialize ironcore cluster kubeconfig: %w", err)
 	}
 	restConfig, err := clientConfig.ClientConfig()
 	if err != nil {
-		return nil, fmt.Errorf("unable to get onmetal cluster rest config: %w", err)
+		return nil, fmt.Errorf("unable to get ironcore cluster rest config: %w", err)
 	}
 	namespace, _, err := clientConfig.Namespace()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get namespace from onmetal kubeconfig: %w", err)
+		return nil, fmt.Errorf("failed to get namespace from ironcore kubeconfig: %w", err)
 	}
 	// TODO: empty or unset namespace will be defaulted to the 'default' namespace. We might want to handle this
 	// as an error.
 	if namespace == "" {
-		return nil, fmt.Errorf("got a empty namespace from onmetal kubeconfig")
+		return nil, fmt.Errorf("got a empty namespace from ironcore kubeconfig")
 	}
 	klog.V(2).Infof("Successfully read configuration for cloud provider: %s", ProviderName)
 

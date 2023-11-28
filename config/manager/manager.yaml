@@ -1,29 +1,29 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: onmetal-cloud-controller-manager
+  name: ironcore-cloud-controller-manager
   labels:
-    k8s-app: onmetal-cloud-controller-manager
+    k8s-app: ironcore-cloud-controller-manager
 spec:
   replicas: 1
   selector:
     matchLabels:
-      k8s-app: onmetal-cloud-controller-manager
+      k8s-app: ironcore-cloud-controller-manager
   template:
     metadata:
       labels:
-        k8s-app: onmetal-cloud-controller-manager
+        k8s-app: ironcore-cloud-controller-manager
     spec:
       serviceAccountName: cloud-controller-manager
       hostNetwork: true
       containers:
         - name: manager
           command:
-            - /onmetal-cloud-controller-manager
+            - /ironcore-cloud-controller-manager
           args:
-            - --cloud-provider=onmetal
+            - --cloud-provider=ironcore
             - --cloud-config=/etc/cloud/cloud-config
-            - --onmetal-kubeconfig=/etc/onmetal/kubeconfig
+            - --ironcore-kubeconfig=/etc/ironcore/kubeconfig
             - --kubeconfig=/etc/kubernetes/kubeconfig
             - --authentication-kubeconfig=/etc/kubernetes/kubeconfig
             - --authorization-kubeconfig=/etc/kubernetes/kubeconfig
@@ -55,8 +55,8 @@ spec:
             - mountPath: /etc/kubernetes
               name: kubeconfig
               readOnly: true
-            - mountPath: /etc/onmetal
-              name: onmetalkubeconfig
+            - mountPath: /etc/ironcore
+              name: ironcore-kubeconfig
               readOnly: true
             - mountPath: /etc/cloud
               name: cloud-config
@@ -75,8 +75,8 @@ spec:
             secretName: kubeconfig
           name: kubeconfig
         - secret:
-            secretName: onmetalkubeconfig
-          name: onmetalkubeconfig
+            secretName: ironcore-kubeconfig
+          name: ironcore-kubeconfig
         - configMap:
             name: kube-root-ca.crt
             items:

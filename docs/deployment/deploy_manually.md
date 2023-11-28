@@ -23,20 +23,20 @@
      $ systemctl restart kubelet
      ```
     
-## Steps to Deploy "Cloud-provider-onmetal"
-* To deploy clone the repository [cloud-provider-onmetal](https://github.com/onmetal/cloud-provider-onmetal)
+## Steps to Deploy "Cloud-provider-ironcore"
+* To deploy clone the repository [cloud-provider-ironcore](https://github.com/ironcore-dev/cloud-provider-ironcore)
 
 ```shell
-git clone git@github.com:onmetal/cloud-provider-onmetal.git
-cd cloud-provider-onmetal
+git clone git@github.com:ironcore-dev/cloud-provider-ironcore.git
+cd cloud-provider-ironcore
 ```
-* Create folder ``config/kind/onmetal`` and create kubeconfig into folder ``config/kind/onmetal/kubeconfig``.
+* Create folder ``config/kind/ironcore`` and create kubeconfig into folder ``config/kind/ironcore/kubeconfig``.
 
-  If you want to use onmetal-api server from different cluster then copy kubeconfig of that cluster into folder ``config/kind/onmetal/kubeconfig``
+  If you want to use ironcore server from different cluster then copy kubeconfig of that cluster into folder ``config/kind/ironcore/kubeconfig``
 
-  If you want to use onmetal-api server from local deployment then copy kubeconfig into folder ``config/kind/onmetal/kubeconfig`` using below command
+  If you want to use ironcore server from local deployment then copy kubeconfig into folder ``config/kind/ironcore/kubeconfig`` using below command
 ```shell
-kind get kubeconfig > ./config/kind/onmetal/kubeconfig
+kind get kubeconfig > ./config/kind/ironcore/kubeconfig
 ```
 * Copy kubeconfig into folder ``config/kind/kubeconfig``
 ```shell
@@ -44,17 +44,17 @@ kind get kubeconfig > ./config/kind/kubeconfig
 ```
 * Create cloud-config file under ``./config/kind/`` with the help of sample file present under ``./config/sample/cloud-config``
 
-    **Note**: The kubeconfig content here is your onmetal-api cluster's kubeconfig incase of a real kubeadm cluster deployment
+    **Note**: The kubeconfig content here is your ironcore-api cluster's kubeconfig incase of a real kubeadm cluster deployment
 
-* Run below make target to deploy the ``cloud-provider-onmetal``
+* Run below make target to deploy the ``cloud-provider-ironcore``
 ```shell
 make docker-build
 kustomize build config/kind | kubectl apply -f -
 ```
 **Validation:**
 ```
-kubectl  get po -n kube-system -o wide| grep onmetal
-onmetal-cloud-controller-manager-crws9    1/1     Running   4 (80s ago)     4m13s   10.244.225.76   csi-master
+kubectl  get po -n kube-system -o wide| grep ironcore
+ironcore-cloud-controller-manager-crws9    1/1     Running   4 (80s ago)     4m13s   10.244.225.76   csi-master
 ```
 
 **Note**: In case that there are multiple environments running, ensure that `kind get clusters` is pointing to the

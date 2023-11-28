@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package onmetal
+package ironcore
 
 import (
 	"context"
@@ -25,32 +25,32 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
-	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
-	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
+	commonv1alpha1 "github.com/ironcore-dev/ironcore/api/common/v1alpha1"
+	computev1alpha1 "github.com/ironcore-dev/ironcore/api/compute/v1alpha1"
+	networkingv1alpha1 "github.com/ironcore-dev/ironcore/api/networking/v1alpha1"
 )
 
-type onmetalRoutes struct {
-	targetClient     client.Client
-	onmetalClient    client.Client
-	onmetalNamespace string
-	cloudConfig      CloudConfig
+type ironcoreRoutes struct {
+	targetClient      client.Client
+	ironcoreClient    client.Client
+	ironcoreNamespace string
+	cloudConfig       CloudConfig
 }
 
-func newOnmetalRoutes(targetClient client.Client, onmetalClient client.Client, namespace string, cloudConfig CloudConfig) cloudprovider.Routes {
-	return &onmetalRoutes{
-		targetClient:     targetClient,
-		onmetalClient:    onmetalClient,
-		onmetalNamespace: namespace,
-		cloudConfig:      cloudConfig,
+func newIroncoreRoutes(targetClient client.Client, ironcoreClient client.Client, namespace string, cloudConfig CloudConfig) cloudprovider.Routes {
+	return &ironcoreRoutes{
+		targetClient:      targetClient,
+		ironcoreClient:    ironcoreClient,
+		ironcoreNamespace: namespace,
+		cloudConfig:       cloudConfig,
 	}
 }
 
-func (o onmetalRoutes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
+func (o ironcoreRoutes) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
 	klog.V(2).InfoS("List Routes", "Cluster", clusterName)
 
 	networkInterfaces := &networkingv1alpha1.NetworkInterfaceList{}
-	if err := o.onmetalClient.List(ctx, networkInterfaces, client.InNamespace(o.onmetalNamespace), client.MatchingFields{
+	if err := o.ironcoreClient.List(ctx, networkInterfaces, client.InNamespace(o.ironcoreNamespace), client.MatchingFields{
 		networkInterfaceSpecNetworkRefNameField: o.cloudConfig.NetworkName,
 	}, client.MatchingLabels{
 		LabelKeyClusterName: clusterName,
@@ -84,13 +84,13 @@ func (o onmetalRoutes) ListRoutes(ctx context.Context, clusterName string) ([]*c
 	return routes, nil
 }
 
-func (o onmetalRoutes) CreateRoute(ctx context.Context, clusterName string, nameHint string, route *cloudprovider.Route) error {
+func (o ironcoreRoutes) CreateRoute(ctx context.Context, clusterName string, nameHint string, route *cloudprovider.Route) error {
 	klog.V(2).InfoS("Creating Route", "Cluster", clusterName, "Route", route, "NameHint", nameHint)
 
 	// get the machine object based on the node name
 	nodeName := string(route.TargetNode)
 	machine := &computev1alpha1.Machine{}
-	if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: nodeName}, machine); err != nil {
+	if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: nodeName}, machine); err != nil {
 		if apierrors.IsNotFound(err) {
 			return cloudprovider.InstanceNotFound
 		}
@@ -116,7 +116,7 @@ func (o onmetalRoutes) CreateRoute(ctx context.Context, clusterName string, name
 					// get the network interface object
 					networkInterfaceName := getNetworkInterfaceName(machine, networkInterface)
 					nic := &networkingv1alpha1.NetworkInterface{}
-					if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: networkInterfaceName}, nic); err != nil {
+					if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: networkInterfaceName}, nic); err != nil {
 						return err
 					}
 
@@ -139,7 +139,7 @@ func (o onmetalRoutes) CreateRoute(ctx context.Context, clusterName string, name
 						nic.Spec.Prefixes = append(nic.Spec.Prefixes, prefixSource)
 
 						klog.V(2).InfoS("Updating NetworkInterface by adding prefix", "NetworkInterface", client.ObjectKeyFromObject(nic), "Node", nodeName, "Prefix", route.DestinationCIDR)
-						if err := o.onmetalClient.Patch(ctx, nic, client.MergeFrom(nicBase)); err != nil {
+						if err := o.ironcoreClient.Patch(ctx, nic, client.MergeFrom(nicBase)); err != nil {
 							return fmt.Errorf("failed to patch NetworkInterface %s for Node %s: %w", client.ObjectKeyFromObject(nic), nodeName, err)
 						}
 					} else {
@@ -155,13 +155,13 @@ func (o onmetalRoutes) CreateRoute(ctx context.Context, clusterName string, name
 	return nil
 }
 
-func (o onmetalRoutes) DeleteRoute(ctx context.Context, clusterName string, route *cloudprovider.Route) error {
+func (o ironcoreRoutes) DeleteRoute(ctx context.Context, clusterName string, route *cloudprovider.Route) error {
 	klog.V(2).InfoS("Deleting Route", "Cluster", clusterName, "Route", route)
 
 	// get the machine object based on the node name
 	nodeName := string(route.TargetNode)
 	machine := &computev1alpha1.Machine{}
-	if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: nodeName}, machine); err != nil {
+	if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: nodeName}, machine); err != nil {
 		if apierrors.IsNotFound(err) {
 			return cloudprovider.InstanceNotFound
 		}
@@ -187,7 +187,7 @@ func (o onmetalRoutes) DeleteRoute(ctx context.Context, clusterName string, rout
 					// get the network interface object
 					networkInterfaceName := getNetworkInterfaceName(machine, networkInterface)
 					nic := &networkingv1alpha1.NetworkInterface{}
-					if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: networkInterfaceName}, nic); err != nil {
+					if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: networkInterfaceName}, nic); err != nil {
 						return err
 					}
 
@@ -198,7 +198,7 @@ func (o onmetalRoutes) DeleteRoute(ctx context.Context, clusterName string, rout
 							nic.Spec.Prefixes = append(nic.Spec.Prefixes[:i], nic.Spec.Prefixes[i+1:]...)
 							klog.V(2).InfoS("Prefix found and removed", "Prefix", prefix.Prefix.String(), "Prefixes after", nic.Spec.Prefixes)
 
-							if err := o.onmetalClient.Patch(ctx, nic, client.MergeFrom(nicBase)); err != nil {
+							if err := o.ironcoreClient.Patch(ctx, nic, client.MergeFrom(nicBase)); err != nil {
 								return fmt.Errorf("failed to patch NetworkInterface %s for Node %s: %w", client.ObjectKeyFromObject(nic), nodeName, err)
 							}
 
@@ -225,7 +225,7 @@ func getNetworkInterfaceName(machine *computev1alpha1.Machine, networkInterface 
 	return fmt.Sprintf("%s-%s", machine.Name, networkInterface.Name)
 }
 
-func (o onmetalRoutes) getTargetNodeAddresses(ctx context.Context, nodeName string) ([]corev1.NodeAddress, error) {
+func (o ironcoreRoutes) getTargetNodeAddresses(ctx context.Context, nodeName string) ([]corev1.NodeAddress, error) {
 	node := &corev1.Node{}
 	if err := o.targetClient.Get(ctx, client.ObjectKey{Name: nodeName}, node); err != nil {
 		return nil, fmt.Errorf("failed to get node object %s: %w", nodeName, err)

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package onmetal
+package ironcore
 
 import (
 	"fmt"
@@ -25,9 +25,9 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
-	commonv1alpha1 "github.com/onmetal/onmetal-api/api/common/v1alpha1"
-	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
-	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
+	commonv1alpha1 "github.com/ironcore-dev/ironcore/api/common/v1alpha1"
+	computev1alpha1 "github.com/ironcore-dev/ironcore/api/compute/v1alpha1"
+	networkingv1alpha1 "github.com/ironcore-dev/ironcore/api/networking/v1alpha1"
 )
 
 var _ = Describe("LoadBalancer", func() {
@@ -168,7 +168,7 @@ var _ = Describe("LoadBalancer", func() {
 		}
 		Eventually(Object(lbRouting)).Should(SatisfyAll(
 			HaveField("ObjectMeta.OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion: "networking.api.onmetal.de/v1alpha1",
+				APIVersion: "networking.ironcore.dev/v1alpha1",
 				Kind:       "LoadBalancer",
 				Name:       loadBalancer.Name,
 				UID:        loadBalancer.UID,
@@ -338,7 +338,7 @@ var _ = Describe("LoadBalancer", func() {
 		}
 		Eventually(Object(lbRouting)).Should(SatisfyAll(
 			HaveField("ObjectMeta.OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion: "networking.api.onmetal.de/v1alpha1",
+				APIVersion: "networking.ironcore.dev/v1alpha1",
 				Kind:       "LoadBalancer",
 				Name:       loadBalancer.Name,
 				UID:        loadBalancer.UID,
@@ -592,7 +592,7 @@ var _ = Describe("LoadBalancer", func() {
 		}
 		Eventually(Object(lbRouting)).Should(SatisfyAll(
 			HaveField("ObjectMeta.OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion: "networking.api.onmetal.de/v1alpha1",
+				APIVersion: "networking.ironcore.dev/v1alpha1",
 				Kind:       "LoadBalancer",
 				Name:       loadBalancer.Name,
 				UID:        loadBalancer.UID,

@@ -23,13 +23,13 @@ ARG TARGETARCH
 # Build
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
-    CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH} go build -a -o manager ./cmd/cloud-provider-onmetal/main.go
+    CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH} go build -a -o manager ./cmd/cloud-provider-ironcore/main.go
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
-COPY --from=builder /workspace/manager /onmetal-cloud-controller-manager
+COPY --from=builder /workspace/manager /ironcore-cloud-controller-manager
 USER 65532:65532
 
-ENTRYPOINT ["/onmetal-cloud-controller-manager"]
+ENTRYPOINT ["/ironcore-cloud-controller-manager"]

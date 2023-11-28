@@ -10,14 +10,14 @@
 
 ## Clone the Repository
 
-To bring up and start locally the `cloud-provider-onmetal` project for development purposes you first need to clone the repository.
+To bring up and start locally the `cloud-provider-ironcore` project for development purposes you first need to clone the repository.
 
 ```shell
-git clone git@github.com:onmetal/cloud-provider-onmetal.git
-cd cloud-provider-onmetal
+git clone git@github.com:ironcore-dev/cloud-provider-ironcore.git
+cd cloud-provider-ironcore
 ```
 
-## Install cloud-provider-onmetal into the kind Cluster
+## Install cloud-provider-ironcore into the kind Cluster
 For local development with `kind` follow below steps
 
 Copy kubeconfig to apply the config in kind
