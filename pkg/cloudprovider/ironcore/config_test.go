@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package onmetal
+package ironcore
 
 import (
 	"os"
@@ -64,7 +64,7 @@ var _ = Describe("Config", func() {
 			_ = kubeconfigFile.Close()
 		}()
 		Expect(os.WriteFile(kubeconfigFile.Name(), kubeconfigData, 0666)).To(Succeed())
-		OnmetalKubeconfigPath = kubeconfigFile.Name()
+		IroncoreKubeconfigPath = kubeconfigFile.Name()
 		config, err := LoadCloudProviderConfig(configReader)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(config.RestConfig).NotTo(BeNil())
@@ -112,7 +112,7 @@ var _ = Describe("Config", func() {
 			_ = kubeconfigFile.Close()
 		}()
 		Expect(os.WriteFile(kubeconfigFile.Name(), kubeconfigData, 0666)).To(Succeed())
-		OnmetalKubeconfigPath = kubeconfigFile.Name()
+		IroncoreKubeconfigPath = kubeconfigFile.Name()
 		config, err := LoadCloudProviderConfig(configReader)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(config.RestConfig).NotTo(BeNil())

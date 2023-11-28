@@ -15,7 +15,7 @@
 package main
 
 import (
-	"github.com/onmetal/cloud-provider-onmetal/pkg/cloudprovider/onmetal"
+	"github.com/ironcore-dev/cloud-provider-ironcore/pkg/cloudprovider/ironcore"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
@@ -42,7 +42,7 @@ func main() {
 	controllerInitializers := app.DefaultInitFuncConstructors
 	namedFlagSets := cliflag.NamedFlagSets{}
 
-	onmetal.AddExtraFlags(pflag.CommandLine)
+	ironcore.AddExtraFlags(pflag.CommandLine)
 
 	controllerAliases := names.CCMControllerAliases()
 
@@ -58,7 +58,7 @@ func cloudInitializer(config *cloudcontrollerconfig.CompletedConfig) cloudprovid
 	providerName := cloudConfig.Name
 
 	if providerName == "" {
-		providerName = onmetal.ProviderName
+		providerName = ironcore.ProviderName
 	}
 
 	// initialize cloud provider with the cloud provider name and config file provided

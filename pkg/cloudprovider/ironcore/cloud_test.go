@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package onmetal
+package ironcore
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -25,7 +25,7 @@ var _ = Describe("Cloud", func() {
 	It("should ensure the correct cloud provider setup", func() {
 		Expect((*cp).HasClusterID()).To(BeTrue())
 
-		Expect((*cp).ProviderName()).To(Equal("onmetal"))
+		Expect((*cp).ProviderName()).To(Equal("ironcore"))
 
 		clusters, ok := (*cp).Clusters()
 		Expect(clusters).To(BeNil())

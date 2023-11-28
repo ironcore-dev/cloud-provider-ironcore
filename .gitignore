@@ -27,4 +27,4 @@ dist/
 dev/
 config/kind/kubeconfig
 config/kind/cloud-config
-config/kind/onmetal/kubeconfig
+config/kind/ironcore/kubeconfig

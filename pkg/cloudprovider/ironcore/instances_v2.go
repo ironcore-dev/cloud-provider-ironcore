@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package onmetal
+package ironcore
 
 import (
 	"context"
@@ -24,34 +24,34 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	computev1alpha1 "github.com/onmetal/onmetal-api/api/compute/v1alpha1"
-	networkingv1alpha1 "github.com/onmetal/onmetal-api/api/networking/v1alpha1"
+	computev1alpha1 "github.com/ironcore-dev/ironcore/api/compute/v1alpha1"
+	networkingv1alpha1 "github.com/ironcore-dev/ironcore/api/networking/v1alpha1"
 )
 
-type onmetalInstancesV2 struct {
-	targetClient     client.Client
-	onmetalClient    client.Client
-	onmetalNamespace string
-	clusterName      string
+type ironcoreInstancesV2 struct {
+	targetClient      client.Client
+	ironcoreClient    client.Client
+	ironcoreNamespace string
+	clusterName       string
 }
 
-func newOnmetalInstancesV2(targetClient client.Client, onmetalClient client.Client, namespace, clusterName string) cloudprovider.InstancesV2 {
-	return &onmetalInstancesV2{
-		targetClient:     targetClient,
-		onmetalClient:    onmetalClient,
-		onmetalNamespace: namespace,
-		clusterName:      clusterName,
+func newIroncoreInstancesV2(targetClient client.Client, ironcoreClient client.Client, namespace, clusterName string) cloudprovider.InstancesV2 {
+	return &ironcoreInstancesV2{
+		targetClient:      targetClient,
+		ironcoreClient:    ironcoreClient,
+		ironcoreNamespace: namespace,
+		clusterName:       clusterName,
 	}
 }
 
-func (o *onmetalInstancesV2) InstanceExists(ctx context.Context, node *corev1.Node) (bool, error) {
+func (o *ironcoreInstancesV2) InstanceExists(ctx context.Context, node *corev1.Node) (bool, error) {
 	if node == nil {
 		return false, nil
 	}
 	klog.V(4).InfoS("Checking if node exists", "Node", node.Name)
 
 	machine := &computev1alpha1.Machine{}
-	if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: node.Name}, machine); err != nil {
+	if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: node.Name}, machine); err != nil {
 		if apierrors.IsNotFound(err) {
 			return false, cloudprovider.InstanceNotFound
 		}
@@ -62,14 +62,14 @@ func (o *onmetalInstancesV2) InstanceExists(ctx context.Context, node *corev1.No
 	return true, nil
 }
 
-func (o *onmetalInstancesV2) InstanceShutdown(ctx context.Context, node *corev1.Node) (bool, error) {
+func (o *ironcoreInstancesV2) InstanceShutdown(ctx context.Context, node *corev1.Node) (bool, error) {
 	if node == nil {
 		return false, nil
 	}
 	klog.V(4).InfoS("Checking if instance is shut down", "Node", node.Name)
 
 	machine := &computev1alpha1.Machine{}
-	if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: node.Name}, machine); err != nil {
+	if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: node.Name}, machine); err != nil {
 		if apierrors.IsNotFound(err) {
 			return false, cloudprovider.InstanceNotFound
 		}
@@ -81,12 +81,12 @@ func (o *onmetalInstancesV2) InstanceShutdown(ctx context.Context, node *corev1.
 	return nodeShutDownStatus, nil
 }
 
-func (o *onmetalInstancesV2) InstanceMetadata(ctx context.Context, node *corev1.Node) (*cloudprovider.InstanceMetadata, error) {
+func (o *ironcoreInstancesV2) InstanceMetadata(ctx context.Context, node *corev1.Node) (*cloudprovider.InstanceMetadata, error) {
 	if node == nil {
 		return nil, nil
 	}
 	machine := &computev1alpha1.Machine{}
-	if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: node.Name}, machine); err != nil {
+	if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: node.Name}, machine); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, cloudprovider.InstanceNotFound
 		}
@@ -100,14 +100,14 @@ func (o *onmetalInstancesV2) InstanceMetadata(ctx context.Context, node *corev1.
 	}
 	machine.Labels[LabelKeyClusterName] = o.clusterName
 	klog.V(2).InfoS("Adding cluster name label to Machine object", "Machine", client.ObjectKeyFromObject(machine), "Node", node.Name)
-	if err := o.onmetalClient.Patch(ctx, machine, client.MergeFrom(machineBase)); err != nil {
+	if err := o.ironcoreClient.Patch(ctx, machine, client.MergeFrom(machineBase)); err != nil {
 		return nil, fmt.Errorf("failed to patch Machine %s for Node %s: %w", client.ObjectKeyFromObject(machine), node.Name, err)
 	}
 
 	for _, networkInterface := range machine.Spec.NetworkInterfaces {
 		nic := &networkingv1alpha1.NetworkInterface{}
 		nicName := fmt.Sprintf("%s-%s", machine.Name, networkInterface.Name)
-		if err := o.onmetalClient.Get(ctx, client.ObjectKey{Namespace: o.onmetalNamespace, Name: nicName}, nic); err != nil {
+		if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: nicName}, nic); err != nil {
 			return nil, fmt.Errorf("failed to get network interface %s for machine %s: %w", client.ObjectKeyFromObject(nic), machine.Name, err)
 		}
 
@@ -118,7 +118,7 @@ func (o *onmetalInstancesV2) InstanceMetadata(ctx context.Context, node *corev1.
 		}
 		nic.Labels[LabelKeyClusterName] = o.clusterName
 		klog.V(2).InfoS("Adding cluster name label to NetworkInterface", "NetworkInterface", client.ObjectKeyFromObject(nic), "Node", node.Name, "Label", nic.Labels[LabelKeyClusterName])
-		if err := o.onmetalClient.Patch(ctx, nic, client.MergeFrom(nicBase)); err != nil {
+		if err := o.ironcoreClient.Patch(ctx, nic, client.MergeFrom(nicBase)); err != nil {
 			return nil, fmt.Errorf("failed to patch NetworkInterface %s for Node %s: %w", client.ObjectKeyFromObject(nic), node.Name, err)
 		}
 	}
@@ -141,7 +141,7 @@ func (o *onmetalInstancesV2) InstanceMetadata(ctx context.Context, node *corev1.
 
 	providerID := node.Spec.ProviderID
 	if providerID == "" {
-		providerID = fmt.Sprintf("%s://%s/%s", ProviderName, o.onmetalNamespace, machine.Name)
+		providerID = fmt.Sprintf("%s://%s/%s", ProviderName, o.ironcoreNamespace, machine.Name)
 	}
 
 	zone := ""
