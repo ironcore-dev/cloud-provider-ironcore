@@ -1,8 +1,9 @@
 # cloud-provider-ironcore
 
-[![Test](https://github.com/ironcore-dev/cloud-provider-ironcore/actions/workflows/test.yml/badge.svg)](https://github.com/ironcore-dev/ceph-provider/actions/workflows/test.yml)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](https://makeapullrequest.com)
-[![GitHub License](https://img.shields.io/static/v1?label=License&message=Apache-2.0&color=blue&style=flat-square)](LICENSE)
+[![REUSE status](https://api.reuse.software/badge/github.com/ironcore-dev/cloud-provider-ironcore)](https://api.reuse.software/info/github.com/ironcore-dev/cloud-provider-ironcore)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ironcore-dev/cloud-provider-ironcore)](https://goreportcard.com/report/github.com/ironcore-dev/cloud-provider-ironcore)
+[![GitHub License](https://img.shields.io/static/v1?label=License&message=Apache-2.0&color=blue)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://makeapullrequest.com)
 
 The `cloud-provider-ironcore` is the [Kubernetes cloud provider](https://github.com/kubernetes/cloud-provider) implementation for IronCore.
 
