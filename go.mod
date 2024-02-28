@@ -1,6 +1,6 @@
 module github.com/ironcore-dev/cloud-provider-ironcore
 
-go 1.21
+go 1.22
 
 require (
 	github.com/ironcore-dev/controller-utils v0.9.2
