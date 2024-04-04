@@ -6,6 +6,7 @@ package ironcore
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -101,8 +102,9 @@ func (o *ironcoreLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNa
 	klog.V(2).InfoS("Getting LoadBalancer ports from Service", "Service", client.ObjectKeyFromObject(service))
 	var lbPorts []networkingv1alpha1.LoadBalancerPort
 	for _, svcPort := range service.Spec.Ports {
+		protocol := svcPort.Protocol
 		lbPorts = append(lbPorts, networkingv1alpha1.LoadBalancerPort{
-			Protocol: &svcPort.Protocol,
+			Protocol: &protocol,
 			Port:     svcPort.Port,
 		})
 	}
@@ -218,6 +220,10 @@ func (o *ironcoreLoadBalancer) applyLoadBalancerRoutingForLoadBalancer(ctx conte
 	if err != nil {
 		return fmt.Errorf("failed to get NetworkInterfaces for Nodes: %w", err)
 	}
+
+	sort.Slice(loadBalacerDestinations, func(i, j int) bool {
+		return loadBalacerDestinations[i].TargetRef.UID < loadBalacerDestinations[j].TargetRef.UID
+	})
 
 	network := &networkingv1alpha1.Network{}
 	networkKey := client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancer.Spec.NetworkRef.Name}
@@ -352,13 +358,13 @@ func (o *ironcoreLoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, cl
 		}
 		return fmt.Errorf("failed to delete loadbalancer %s: %w", client.ObjectKeyFromObject(loadBalancer), err)
 	}
-	if err := waitForDeletingLoadBalancer(ctx, service, o.ironcoreClient, loadBalancer); err != nil {
+	if err := waitForDeletingLoadBalancer(ctx, o.ironcoreClient, loadBalancer); err != nil {
 		return err
 	}
 	return nil
 }
 
-func waitForDeletingLoadBalancer(ctx context.Context, service *v1.Service, ironcoreClient client.Client, loadBalancer *networkingv1alpha1.LoadBalancer) error {
+func waitForDeletingLoadBalancer(ctx context.Context, ironcoreClient client.Client, loadBalancer *networkingv1alpha1.LoadBalancer) error {
 	klog.V(2).InfoS("Waiting for LoadBalancer instance to be deleted", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
 	backoff := wait.Backoff{
 		Duration: waitLoadbalancerInitDelay,

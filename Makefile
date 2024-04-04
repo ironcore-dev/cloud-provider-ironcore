@@ -9,6 +9,7 @@ GOBIN=$(shell go env GOPATH)/bin
 else
 GOBIN=$(shell go env GOBIN)
 endif
+BUILDARGS ?=
 
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
@@ -48,7 +49,7 @@ test: fmt vet envtest ## Run tests.
 .PHONY: docker-build
 # Build the docker image
 docker-build:
-	docker build . -t $(IMG)
+	docker build $(BUILDARGS) . -t $(IMG) --load
 
 .PHONY: docker-push
 docker-push:
