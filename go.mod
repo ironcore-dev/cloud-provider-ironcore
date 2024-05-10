@@ -1,6 +1,7 @@
 module github.com/ironcore-dev/cloud-provider-ironcore
 
 go 1.22
+toolchain go1.22.2
 
 require (
 	github.com/ironcore-dev/controller-utils v0.9.3
@@ -9,8 +10,8 @@ require (
 	github.com/onsi/gomega v1.33.1
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/pflag v1.0.5
-	k8s.io/api v0.29.3
-	k8s.io/apimachinery v0.29.3
+	k8s.io/api v0.30.0
+	k8s.io/apimachinery v0.30.0
 	k8s.io/client-go v0.29.3
 	k8s.io/cloud-provider v0.29.3
 	k8s.io/component-base v0.29.3
@@ -112,7 +113,7 @@ require (
 	k8s.io/component-helpers v0.29.3 // indirect
 	k8s.io/kms v0.29.3 // indirect
 	k8s.io/kube-aggregator v0.29.0 // indirect
-	k8s.io/kube-openapi v0.0.0-20231010175941-2dd684a91f00 // indirect
+	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.28.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
