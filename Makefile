@@ -77,8 +77,8 @@ GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint
 
 ## Tool Versions
 ADDLICENSE_VERSION ?= v1.1.1
-GOIMPORTS_VERSION ?= v0.18.0
-GOLANGCI_LINT_VERSION ?= v1.56.2
+GOIMPORTS_VERSION ?= v0.21.0
+GOLANGCI_LINT_VERSION ?= v1.58.0
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
