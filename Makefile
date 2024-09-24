@@ -2,7 +2,7 @@ BIN_NAME = "cloud-provider-ironcore"
 IMG ?= controller:latest
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.28.0
+ENVTEST_K8S_VERSION = 1.29.0
 
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -14,10 +14,10 @@ SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
 .PHONY: all
-all: compile
+all: build
 
-.PHONY: compile
-compile: fmt vet
+.PHONY: build
+build: fmt vet
 	go build -o dist/$(BIN_NAME) cmd/$(BIN_NAME)/main.go
 
 .PHONY: lint
@@ -43,7 +43,7 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 test: fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
 
 .PHONY: docker-build
 # Build the docker image
@@ -53,10 +53,6 @@ docker-build:
 .PHONY: docker-push
 docker-push:
 	docker push $(IMG)
-
-.PHONY: clean
-clean:
-	rm -rf ./dist/
 
 .PHONY: clean-local-bin
 clean-local-bin:
@@ -77,8 +73,8 @@ GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint
 
 ## Tool Versions
 ADDLICENSE_VERSION ?= v1.1.1
-GOIMPORTS_VERSION ?= v0.21.0
-GOLANGCI_LINT_VERSION ?= v1.58.0
+GOIMPORTS_VERSION ?= v0.25.0
+GOLANGCI_LINT_VERSION ?= v1.61.0
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
