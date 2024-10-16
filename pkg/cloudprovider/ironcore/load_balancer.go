@@ -68,9 +68,20 @@ func (o *ironcoreLoadBalancer) GetLoadBalancer(ctx context.Context, clusterName 
 	return status, true, nil
 }
 
+func getLegacyLoadBalancerName(clusterName string, service *v1.Service) string {
+	nameSuffix := strings.Split(string(service.UID), "-")[0]
+	return fmt.Sprintf("%s-%s-%s", clusterName, service.Name, nameSuffix)
+}
+
 func (o *ironcoreLoadBalancer) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
-	cloudprovider.DefaultLoadBalancerName(service)
-	return getLoadBalancerNameForService(clusterName, service)
+	legacyLoadBalancerName := getLegacyLoadBalancerName(clusterName, service)
+	existingLoadBalancer := &networkingv1alpha1.LoadBalancer{}
+	if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: legacyLoadBalancerName}, existingLoadBalancer); err == nil {
+		return existingLoadBalancer.Name
+	}
+
+	lbName := string(service.UID)
+	return strings.Replace(lbName, "-", "", -1)
 }
 
 func (o *ironcoreLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
@@ -84,7 +95,7 @@ func (o *ironcoreLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNa
 		desiredLoadBalancerType = networkingv1alpha1.LoadBalancerTypePublic
 	}
 
-	loadBalancerName := getLoadBalancerNameForService(clusterName, service)
+	loadBalancerName := o.GetLoadBalancerName(ctx, clusterName, service)
 
 	// get existing load balancer type
 	existingLoadBalancer := &networkingv1alpha1.LoadBalancer{}
@@ -172,11 +183,6 @@ func (o *ironcoreLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNa
 		return nil, err
 	}
 	return &lbStatus, nil
-}
-
-func getLoadBalancerNameForService(clusterName string, service *v1.Service) string {
-	nameSuffix := strings.Split(string(service.UID), "-")[0]
-	return fmt.Sprintf("%s-%s-%s", clusterName, service.Name, nameSuffix)
 }
 
 func waitLoadBalancerActive(ctx context.Context, ironcoreClient client.Client, existingLoadBalancerType networkingv1alpha1.LoadBalancerType,
