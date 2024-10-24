@@ -5,10 +5,12 @@ package ironcore
 
 import (
 	"fmt"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	cloudprovider "k8s.io/cloud-provider"
@@ -606,6 +608,189 @@ var _ = Describe("LoadBalancer", func() {
 				},
 			})),
 		))
+	})
+
+	It("should ensure LoadBalancer with legacy name", func(ctx SpecContext) {
+		By("creating a machine object")
+		machine := &computev1alpha1.Machine{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "machine-",
+			},
+			Spec: computev1alpha1.MachineSpec{
+				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
+				Image:           "my-image:latest",
+				Volumes:         []computev1alpha1.Volume{},
+			},
+		}
+		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, machine)
+
+		By("creating a network interface for machine")
+		networkInterface := &networkingv1alpha1.NetworkInterface{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      fmt.Sprintf("%s-%s", machine.Name, "networkinterface"),
+			},
+			Spec: networkingv1alpha1.NetworkInterfaceSpec{
+				NetworkRef: corev1.LocalObjectReference{Name: network.Name},
+				IPs: []networkingv1alpha1.IPSource{{
+					Value: commonv1alpha1.MustParseNewIP("100.0.0.1"),
+				}},
+				MachineRef: &commonv1alpha1.LocalUIDReference{
+					Name: machine.Name,
+					UID:  machine.UID,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, networkInterface)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, networkInterface)
+
+		By("patching the network interface status")
+		Eventually(UpdateStatus(networkInterface, func() {
+			networkInterface.Status.State = networkingv1alpha1.NetworkInterfaceStateAvailable
+			networkInterface.Status.IPs = []commonv1alpha1.IP{
+				commonv1alpha1.MustParseIP("100.0.0.1"),
+			}
+		})).Should(Succeed())
+
+		By("creating a network interface for machine with network")
+		networkInterfaceFoo := &networkingv1alpha1.NetworkInterface{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      fmt.Sprintf("%s-%s", machine.Name, "networkinterfacefoo"),
+			},
+			Spec: networkingv1alpha1.NetworkInterfaceSpec{
+				NetworkRef: corev1.LocalObjectReference{Name: "foo"},
+				IPs: []networkingv1alpha1.IPSource{{
+					Value: commonv1alpha1.MustParseNewIP("100.0.0.2"),
+				}},
+				MachineRef: &commonv1alpha1.LocalUIDReference{
+					Name: machine.Name,
+					UID:  machine.UID,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, networkInterfaceFoo)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, networkInterfaceFoo)
+
+		By("patching the network interface status")
+		Eventually(UpdateStatus(networkInterfaceFoo, func() {
+			networkInterfaceFoo.Status.State = networkingv1alpha1.NetworkInterfaceStateAvailable
+			networkInterfaceFoo.Status.IPs = []commonv1alpha1.IP{
+				commonv1alpha1.MustParseIP("100.0.0.1"),
+			}
+		})).Should(Succeed())
+
+		By("creating node object with a provider ID referencing the machine")
+		node := &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: machine.Name,
+			},
+			Spec: corev1.NodeSpec{
+				ProviderID: getProviderID(machine.Namespace, machine.Name),
+			},
+		}
+		Expect(k8sClient.Create(ctx, node)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, node)
+
+		By("patching the network interfaces of the machine")
+		Eventually(Update(machine, func() {
+			machine.Spec.NetworkInterfaces = []computev1alpha1.NetworkInterface{
+				{
+					Name: "primary",
+					NetworkInterfaceSource: computev1alpha1.NetworkInterfaceSource{
+						NetworkInterfaceRef: &corev1.LocalObjectReference{
+							Name: networkInterface.Name,
+						},
+					},
+				},
+				{
+					Name: "secondary",
+					NetworkInterfaceSource: computev1alpha1.NetworkInterfaceSource{
+						NetworkInterfaceRef: &corev1.LocalObjectReference{
+							Name: networkInterfaceFoo.Name,
+						},
+					},
+				},
+			}
+		})).Should(Succeed())
+
+		By("creating test service of type load balancer")
+		service := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "service-",
+				Namespace:    ns.Name,
+			},
+			Spec: corev1.ServiceSpec{
+				Type: corev1.ServiceTypeLoadBalancer,
+				Ports: []corev1.ServicePort{
+					{
+						Name:       "https",
+						Protocol:   "TCP",
+						Port:       443,
+						TargetPort: intstr.IntOrString{IntVal: 443},
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, service)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, service)
+
+		// Creating loadbalancer with legacy name
+		nameSuffix := strings.Split(string(service.UID), "-")[0]
+		lbName := fmt.Sprintf("%s-%s-%s", clusterName, service.Name, nameSuffix)
+		var lbPorts []networkingv1alpha1.LoadBalancerPort
+		for _, svcPort := range service.Spec.Ports {
+			protocol := svcPort.Protocol
+			lbPorts = append(lbPorts, networkingv1alpha1.LoadBalancerPort{
+				Protocol: &protocol,
+				Port:     svcPort.Port,
+			})
+		}
+		loadBalancer := &networkingv1alpha1.LoadBalancer{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "LoadBalancer",
+				APIVersion: networkingv1alpha1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      lbName,
+				Namespace: ns.Name,
+				Annotations: map[string]string{
+					AnnotationKeyClusterName:      clusterName,
+					AnnotationKeyServiceName:      service.Name,
+					AnnotationKeyServiceNamespace: service.Namespace,
+					AnnotationKeyServiceUID:       string(service.UID),
+				},
+			},
+			Spec: networkingv1alpha1.LoadBalancerSpec{
+				Type:       networkingv1alpha1.LoadBalancerTypePublic,
+				IPFamilies: service.Spec.IPFamilies,
+				NetworkRef: v1.LocalObjectReference{
+					Name: network.Name,
+				},
+				Ports: lbPorts,
+			},
+		}
+		Expect(k8sClient.Create(ctx, loadBalancer)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, loadBalancer)
+
+		go func() {
+			defer GinkgoRecover()
+			By("patching public IP into load balancer status")
+			Eventually(UpdateStatus(loadBalancer, func() {
+				loadBalancer.Status.IPs = []commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.1")}
+			})).Should(Succeed())
+		}()
+
+		By("ensuring load balancer for service")
+		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().To(BeNil())
+
+		By("ensuring the load balancer type is public and load balancer status has public IP")
+		Eventually(Object(loadBalancer)).Should(SatisfyAll(
+			HaveField("ObjectMeta.Name", Equal(lbName)),
+			HaveField("Spec.Type", Equal(networkingv1alpha1.LoadBalancerTypePublic)),
+			HaveField("Status.IPs", Equal([]commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.1")}))))
 	})
 
 	It("should fail to get load balancer info if no load balancer is present", func(ctx SpecContext) {

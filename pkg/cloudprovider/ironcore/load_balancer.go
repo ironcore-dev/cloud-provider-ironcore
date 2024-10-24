@@ -54,8 +54,11 @@ func newIroncoreLoadBalancer(targetClient client.Client, ironcoreClient client.C
 func (o *ironcoreLoadBalancer) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
 	klog.V(2).InfoS("GetLoadBalancer for Service", "Cluster", clusterName, "Service", client.ObjectKeyFromObject(service))
 
+	loadBalancerName, err := o.getLoadBalancerName(ctx, clusterName, service)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to get LoadBalancer name for Service %s: %w", client.ObjectKeyFromObject(service), err)
+	}
 	loadBalancer := &networkingv1alpha1.LoadBalancer{}
-	loadBalancerName := o.GetLoadBalancerName(ctx, clusterName, service)
 	if err = o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancerName}, loadBalancer); err != nil {
 		return nil, false, fmt.Errorf("failed to get LoadBalancer %s for Service %s: %w", loadBalancerName, client.ObjectKeyFromObject(service), err)
 	}
@@ -68,9 +71,31 @@ func (o *ironcoreLoadBalancer) GetLoadBalancer(ctx context.Context, clusterName 
 	return status, true, nil
 }
 
+func getLegacyLoadBalancerName(clusterName string, service *v1.Service) string {
+	nameSuffix := strings.Split(string(service.UID), "-")[0]
+	return fmt.Sprintf("%s-%s-%s", clusterName, service.Name, nameSuffix)
+}
+
+func (o *ironcoreLoadBalancer) getLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) (string, error) {
+	legacyLoadBalancerName := getLegacyLoadBalancerName(clusterName, service)
+	existingLoadBalancer := &networkingv1alpha1.LoadBalancer{}
+
+	if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: legacyLoadBalancerName}, existingLoadBalancer); err != nil {
+		if apierrors.IsNotFound(err) {
+			return strings.Replace(string(service.UID), "-", "", -1), nil
+		}
+		return "", err
+	}
+	return legacyLoadBalancerName, nil
+}
+
 func (o *ironcoreLoadBalancer) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
-	cloudprovider.DefaultLoadBalancerName(service)
-	return getLoadBalancerNameForService(clusterName, service)
+	lbName, err := o.getLoadBalancerName(ctx, clusterName, service)
+	if err != nil {
+		klog.V(2).ErrorS(err, "failed to get LoadBalancer for Service", "Service", client.ObjectKeyFromObject(service))
+		return ""
+	}
+	return lbName
 }
 
 func (o *ironcoreLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
@@ -84,7 +109,10 @@ func (o *ironcoreLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNa
 		desiredLoadBalancerType = networkingv1alpha1.LoadBalancerTypePublic
 	}
 
-	loadBalancerName := getLoadBalancerNameForService(clusterName, service)
+	loadBalancerName, err := o.getLoadBalancerName(ctx, clusterName, service)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get LoadBalancer name for Service %s: %w", client.ObjectKeyFromObject(service), err)
+	}
 
 	// get existing load balancer type
 	existingLoadBalancer := &networkingv1alpha1.LoadBalancer{}
@@ -172,11 +200,6 @@ func (o *ironcoreLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNa
 		return nil, err
 	}
 	return &lbStatus, nil
-}
-
-func getLoadBalancerNameForService(clusterName string, service *v1.Service) string {
-	nameSuffix := strings.Split(string(service.UID), "-")[0]
-	return fmt.Sprintf("%s-%s-%s", clusterName, service.Name, nameSuffix)
 }
 
 func waitLoadBalancerActive(ctx context.Context, ironcoreClient client.Client, existingLoadBalancerType networkingv1alpha1.LoadBalancerType,
@@ -308,7 +331,11 @@ func (o *ironcoreLoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterNa
 		return fmt.Errorf("no Nodes available for LoadBalancer Service %s", client.ObjectKeyFromObject(service))
 	}
 
-	loadBalancerName := o.GetLoadBalancerName(ctx, clusterName, service)
+	loadBalancerName, err := o.getLoadBalancerName(ctx, clusterName, service)
+	if err != nil {
+		return fmt.Errorf("failed to get LoadBalancer name for Service %s: %w", client.ObjectKeyFromObject(service), err)
+	}
+
 	loadBalancer := &networkingv1alpha1.LoadBalancer{}
 	loadBalancerKey := client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancerName}
 	if err := o.ironcoreClient.Get(ctx, loadBalancerKey, loadBalancer); err != nil {
@@ -338,7 +365,11 @@ func (o *ironcoreLoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterNa
 }
 
 func (o *ironcoreLoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
-	loadBalancerName := o.GetLoadBalancerName(ctx, clusterName, service)
+	loadBalancerName, err := o.getLoadBalancerName(ctx, clusterName, service)
+	if err != nil {
+		return fmt.Errorf("failed to get LoadBalancer name for Service %s: %w", client.ObjectKeyFromObject(service), err)
+	}
+
 	loadBalancer := &networkingv1alpha1.LoadBalancer{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: o.ironcoreNamespace,
