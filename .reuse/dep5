@@ -9,7 +9,7 @@ Source: https://github.com/ironcore-dev/cloud-provider-ironcore
 Files:
   .github/*
   .gitignore
-  .golangci.yaml
+  .golangci.yml
   .dockerignore
   CODE_OF_CONDUCT.md
   CODEOWNERS
