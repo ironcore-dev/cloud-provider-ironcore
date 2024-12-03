@@ -64,7 +64,7 @@ var _ = Describe("Config", func() {
 	})
 
 	It("should get the default namespace if no namespace was defined for an auth context", func() {
-		sampleConfig := map[string]any{"networkName": "my-network", "prefixName": []string{"my-prefix"}, "clusterName": "my-cluster"}
+		sampleConfig := map[string]any{"networkName": "my-network", "prefixNames": []string{"my-prefix"}, "clusterName": "my-cluster"}
 		sampleConfigData, err := yaml.Marshal(sampleConfig)
 		Expect(err).NotTo(HaveOccurred())
 
