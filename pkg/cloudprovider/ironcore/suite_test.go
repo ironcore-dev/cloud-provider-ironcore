@@ -208,7 +208,7 @@ func SetupTest() (*corev1.Namespace, *cloudprovider.Interface, *networkingv1alph
 		defer func() {
 			_ = cloudConfigFile.Close()
 		}()
-		cloudConfig := CloudConfig{NetworkName: network.Name, PrefixName: prefix.Name, ClusterName: clusterName}
+		cloudConfig := CloudConfig{NetworkName: network.Name, PrefixNames: []string{prefix.Name}, ClusterName: clusterName}
 		cloudConfigData, err := yaml.Marshal(&cloudConfig)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(os.WriteFile(cloudConfigFile.Name(), cloudConfigData, 0666)).To(Succeed())
