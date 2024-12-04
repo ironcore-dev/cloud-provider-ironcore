@@ -3,6 +3,7 @@ module github.com/ironcore-dev/cloud-provider-ironcore
 go 1.23.0
 
 require (
+	github.com/gardener/aws-ipam-controller v0.2.0
 	github.com/ironcore-dev/controller-utils v0.9.7
 	github.com/ironcore-dev/ironcore v0.2.2-0.20241219142352-bf1d9998cc71
 	github.com/onsi/ginkgo/v2 v2.22.2
@@ -17,6 +18,7 @@ require (
 	k8s.io/component-base v0.31.4
 	k8s.io/controller-manager v0.31.0
 	k8s.io/klog/v2 v2.130.1
+	k8s.io/utils v0.0.0-20241104163129-6fe5fd82f078
 	sigs.k8s.io/controller-runtime v0.19.4
 	sigs.k8s.io/yaml v1.4.0
 )
