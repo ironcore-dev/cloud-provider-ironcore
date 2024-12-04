@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and IronCore contributors
+// SPDX-License-Identifier: Apache-2.0
 package ironcore
 
 import (
@@ -151,20 +153,18 @@ func NewCIDRRangeAllocator(ctx context.Context, client client.Client, irconcoreC
 	if err := client.List(ctx, nodeList); err != nil {
 		return nil, fmt.Errorf("error listing nodes: %w", err)
 	}
-	if nodeList != nil {
-		for _, node := range nodeList.Items {
-			if len(node.Spec.PodCIDRs) == 0 {
-				klog.V(4).Infof("Node %v has no CIDR, ignoring", node.Name)
-				continue
-			}
-			klog.V(4).Infof("Node %v has CIDR %s, occupying it in CIDR map", node.Name, node.Spec.PodCIDR)
-			if err := ca.occupyCIDRs(&node); err != nil {
-				// This will happen if:
-				// 1. We find garbage in the podCIDRs field. Retrying is useless.
-				// 2. CIDR out of range: This means a node CIDR has changed.
-				// This error will keep crashing aws-ipam-controller.
-				return nil, err
-			}
+	for _, node := range nodeList.Items {
+		if len(node.Spec.PodCIDRs) == 0 {
+			klog.V(4).Infof("Node %v has no CIDR, ignoring", node.Name)
+			continue
+		}
+		klog.V(4).Infof("Node %v has CIDR %s, occupying it in CIDR map", node.Name, node.Spec.PodCIDR)
+		if err := ca.occupyCIDRs(&node); err != nil {
+			// This will happen if:
+			// 1. We find garbage in the podCIDRs field. Retrying is useless.
+			// 2. CIDR out of range: This means a node CIDR has changed.
+			// This error will keep crashing aws-ipam-controller.
+			return nil, err
 		}
 	}
 

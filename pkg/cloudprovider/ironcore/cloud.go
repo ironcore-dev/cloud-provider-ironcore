@@ -13,6 +13,7 @@ import (
 
 	"k8s.io/utils/ptr"
 
+	nodeutil "github.com/gardener/aws-ipam-controller/pkg/node"
 	computev1alpha1 "github.com/ironcore-dev/ironcore/api/compute/v1alpha1"
 	ipamv1alpha1 "github.com/ironcore-dev/ironcore/api/ipam/v1alpha1"
 	networkingv1alpha1 "github.com/ironcore-dev/ironcore/api/networking/v1alpha1"
@@ -21,6 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	gocache "k8s.io/client-go/tools/cache"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -110,6 +112,9 @@ func (o *cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, 
 			ClusterCIDRs:      []*net.IPNet{cidr},
 			NodeCIDRMaskSizes: []int{24},
 		}, nodeInformer, "dual-stack", ptr.To(500*time.Millisecond), 112)
+	if err != nil {
+		klog.Fatalf("Failed to initialize CIDR allocator: %v", err)
+	}
 
 	if err := o.ironcoreCluster.GetFieldIndexer().IndexField(ctx, &computev1alpha1.Machine{}, machineMetadataUIDField, func(object client.Object) []string {
 		machine := object.(*computev1alpha1.Machine)
@@ -148,6 +153,39 @@ func (o *cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, 
 	if !o.targetCluster.GetCache().WaitForCacheSync(ctx) {
 		log.Fatal("Failed to wait for target cluster cache to sync")
 	}
+	_, err = nodeInformer.AddEventHandler(gocache.ResourceEventHandlerFuncs{
+		AddFunc: nodeutil.CreateAddNodeHandler(o.cidrAllocator.AllocateOrOccupyCIDR),
+		UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(_, newNode *corev1.Node) error {
+			// If the PodCIDRs list is not empty we either:
+			// - already processed a Node that already had CIDRs after NC restarted
+			//   (cidr is marked as used),
+			// - already processed a Node successfully and allocated CIDRs for it
+			//   (cidr is marked as used),
+			// - already processed a Node but we did saw a "timeout" response and
+			//   request eventually got through in this case we haven't released
+			//   the allocated CIDRs (cidr is still marked as used).
+			// There's a possible error here:
+			// - NC sees a new Node and assigns CIDRs X,Y.. to it,
+			// - Update Node call fails with a timeout,
+			// - Node is updated by some other component, NC sees an update and
+			//   assigns CIDRs A,B.. to the Node,
+			// - Both CIDR X,Y.. and CIDR A,B.. are marked as used in the local cache,
+			//   even though Node sees only CIDR A,B..
+			// The problem here is that in in-memory cache we see CIDR X,Y.. as marked,
+			// which prevents it from being assigned to any new node. The cluster
+			// state is correct.
+			// Restart of NC fixes the issue.
+			if len(newNode.Spec.PodCIDRs) == 0 {
+				return o.cidrAllocator.AllocateOrOccupyCIDR(newNode)
+			}
+			return nil
+		}),
+		DeleteFunc: nodeutil.CreateDeleteNodeHandler(o.cidrAllocator.ReleaseCIDR),
+	})
+	// Create the stopCh channel
+	stopCh := make(chan struct{})
+	go o.cidrAllocator.Run(ctx, stopCh)
+
 	klog.V(2).Infof("Successfully initialized cloud provider: %s", ProviderName)
 }
 
