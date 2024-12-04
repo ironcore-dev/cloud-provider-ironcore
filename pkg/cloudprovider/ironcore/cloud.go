@@ -8,6 +8,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
+	"time"
+
+	"k8s.io/utils/ptr"
 
 	computev1alpha1 "github.com/ironcore-dev/ironcore/api/compute/v1alpha1"
 	ipamv1alpha1 "github.com/ironcore-dev/ironcore/api/ipam/v1alpha1"
@@ -70,6 +74,7 @@ type cloud struct {
 	loadBalancer      cloudprovider.LoadBalancer
 	instancesV2       cloudprovider.InstancesV2
 	routes            cloudprovider.Routes
+	cidrAllocator     CIDRAllocator
 }
 
 func (o *cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
@@ -89,9 +94,22 @@ func (o *cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, 
 		log.Fatalf("Failed to create new cluster: %v", err)
 	}
 
+	nodeInformer, err := o.targetCluster.GetCache().GetInformer(ctx, &corev1.Node{})
+	if err != nil {
+		klog.Fatalf("Failed to get informer for Node: %v", err)
+	}
+	_, cidr, err := net.ParseCIDR("100.80.0.0/12")
+	if err != nil {
+		klog.Fatalf("Failed to parse CIDR: %v", err)
+	}
 	o.instancesV2 = newIroncoreInstancesV2(o.targetCluster.GetClient(), o.ironcoreCluster.GetClient(), o.ironcoreNamespace, o.cloudConfig.ClusterName)
 	o.loadBalancer = newIroncoreLoadBalancer(o.targetCluster.GetClient(), o.ironcoreCluster.GetClient(), o.ironcoreNamespace, o.cloudConfig)
 	o.routes = newIroncoreRoutes(o.targetCluster.GetClient(), o.ironcoreCluster.GetClient(), o.ironcoreNamespace, o.cloudConfig)
+	o.cidrAllocator, err = NewCIDRRangeAllocator(ctx, o.targetCluster.GetClient(), o.ironcoreCluster.GetClient(), o.ironcoreNamespace,
+		CIDRAllocatorParams{
+			ClusterCIDRs:      []*net.IPNet{cidr},
+			NodeCIDRMaskSizes: []int{24},
+		}, nodeInformer, "dual-stack", ptr.To(500*time.Millisecond), 112)
 
 	if err := o.ironcoreCluster.GetFieldIndexer().IndexField(ctx, &computev1alpha1.Machine{}, machineMetadataUIDField, func(object client.Object) []string {
 		machine := object.(*computev1alpha1.Machine)
