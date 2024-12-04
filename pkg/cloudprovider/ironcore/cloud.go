@@ -108,7 +108,7 @@ func (o *cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, 
 	o.instancesV2 = newIroncoreInstancesV2(o.targetCluster.GetClient(), o.ironcoreCluster.GetClient(), o.ironcoreNamespace, o.cloudConfig.ClusterName)
 	o.loadBalancer = newIroncoreLoadBalancer(o.targetCluster.GetClient(), o.ironcoreCluster.GetClient(), o.ironcoreNamespace, o.cloudConfig)
 	o.routes = newIroncoreRoutes(o.targetCluster.GetClient(), o.ironcoreCluster.GetClient(), o.ironcoreNamespace, o.cloudConfig)
-	o.cidrAllocator, err = NewCIDRRangeAllocator(ctx, o.targetCluster.GetClient(), o.ironcoreCluster.GetClient(), o.ironcoreNamespace,
+	o.cidrAllocator, err = NewCIDRRangeAllocator(ctx, o.targetCluster.GetClient(), o.targetCluster.GetAPIReader(), o.ironcoreCluster.GetClient(), o.ironcoreNamespace,
 		CIDRAllocatorParams{
 			ClusterCIDRs:      []*net.IPNet{cidr},
 			NodeCIDRMaskSizes: []int{24},

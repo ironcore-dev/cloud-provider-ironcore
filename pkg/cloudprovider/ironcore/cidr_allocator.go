@@ -112,7 +112,7 @@ type cidrAllocator struct {
 // Caller must ensure subNetMaskSize is not less than cluster CIDR mask size.
 // Caller must always pass in a list of existing nodes so the new allocator.
 // can initialize its CIDR map. NodeList is only nil in testing.
-func NewCIDRRangeAllocator(ctx context.Context, client client.Client, irconcoreClient client.Client,
+func NewCIDRRangeAllocator(ctx context.Context, client client.Client, apireader client.Reader, irconcoreClient client.Client,
 	ironcoreNamespace string, allocatorParams CIDRAllocatorParams, nodeInformer runtimecache.Informer,
 	mode string, tickPeriod *time.Duration, nodeCIDRMaskSizeIPv6 int) (CIDRAllocator, error) {
 	if client == nil {
@@ -150,7 +150,7 @@ func NewCIDRRangeAllocator(ctx context.Context, client client.Client, irconcoreC
 	}
 
 	nodeList := &v1.NodeList{}
-	if err := client.List(ctx, nodeList); err != nil {
+	if err := apireader.List(ctx, nodeList); err != nil {
 		return nil, fmt.Errorf("error listing nodes: %w", err)
 	}
 	for _, node := range nodeList.Items {
