@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
 	"time"
 
 	"k8s.io/utils/ptr"
@@ -182,6 +183,11 @@ func (o *cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, 
 		}),
 		DeleteFunc: nodeutil.CreateDeleteNodeHandler(o.cidrAllocator.ReleaseCIDR),
 	})
+	if err != nil {
+		klog.Error(err, " unable to add components informer event handler")
+		os.Exit(1)
+	}
+
 	// Create the stopCh channel
 	stopCh := make(chan struct{})
 	go o.cidrAllocator.Run(ctx, stopCh)
