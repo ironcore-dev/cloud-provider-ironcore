@@ -3,7 +3,7 @@ module github.com/ironcore-dev/cloud-provider-ironcore
 go 1.23.0
 
 require (
-	github.com/ironcore-dev/controller-utils v0.9.5
+	github.com/ironcore-dev/controller-utils v0.9.6
 	github.com/ironcore-dev/ironcore v0.2.0
 	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.36.1
@@ -105,7 +105,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.30.4 // indirect
+	k8s.io/apiextensions-apiserver v0.30.6 // indirect
 	k8s.io/apiserver v0.30.7 // indirect
 	k8s.io/component-helpers v0.30.7 // indirect
 	k8s.io/kms v0.30.7 // indirect
