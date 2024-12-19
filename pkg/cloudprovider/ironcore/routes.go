@@ -94,9 +94,9 @@ func (o ironcoreRoutes) CreateRoute(ctx context.Context, clusterName string, nam
 	for _, address := range route.TargetNodeAddresses {
 		if address.Type == corev1.NodeInternalIP {
 			klog.V(3).InfoS("Evaluating internal IP address", "Node", nodeName, "Address", address.Address)
-			for _, networkInterface := range machine.Status.NetworkInterfaces {
+			for _, machineStatusNetworkInterface := range machine.Status.NetworkInterfaces {
 				interfaceFound := false
-				for _, p := range networkInterface.IPs {
+				for _, p := range machineStatusNetworkInterface.IPs {
 					if p.String() == address.Address {
 						interfaceFound = true
 						break
@@ -106,9 +106,9 @@ func (o ironcoreRoutes) CreateRoute(ctx context.Context, clusterName string, nam
 				// If a matching network interface is found, proceed with prefix operations
 				if interfaceFound {
 					klog.V(3).InfoS("Matching network interface identified", "Node", nodeName, "Address", address.Address)
-					networkInterfaceName := getNetworkInterfaceName(machine, networkInterface)
-					nic := &networkingv1alpha1.NetworkInterface{}
-					if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: networkInterfaceName}, nic); err != nil {
+					networkInterfaceName := machineStatusNetworkInterface.NetworkInterfaceRef.Name
+					networkInterface := &networkingv1alpha1.NetworkInterface{}
+					if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: networkInterfaceName}, networkInterface); err != nil {
 						return err
 					}
 
@@ -116,7 +116,7 @@ func (o ironcoreRoutes) CreateRoute(ctx context.Context, clusterName string, nam
 
 					// Check if the prefix already exists in the network interface
 					prefixExists := false
-					for _, prefix := range nic.Status.Prefixes {
+					for _, prefix := range networkInterface.Status.Prefixes {
 						if prefix.Prefix.String() == route.DestinationCIDR {
 							prefixExists = true
 							break
@@ -126,15 +126,15 @@ func (o ironcoreRoutes) CreateRoute(ctx context.Context, clusterName string, nam
 					// If the prefix is not found, add it to the network interface specification
 					if !prefixExists {
 						klog.V(3).InfoS("Prefix not detected, proceeding with addition", "NetworkInterface", networkInterfaceName, "Prefix", route.DestinationCIDR)
-						nicBase := nic.DeepCopy()
+						nicBase := networkInterface.DeepCopy()
 						ipPrefix := commonv1alpha1.MustParseIPPrefix(route.DestinationCIDR)
 						prefixSource := networkingv1alpha1.PrefixSource{
 							Value: &ipPrefix,
 						}
-						nic.Spec.Prefixes = append(nic.Spec.Prefixes, prefixSource)
+						networkInterface.Spec.Prefixes = append(networkInterface.Spec.Prefixes, prefixSource)
 
 						klog.V(2).InfoS("Applying patch to NetworkInterface to incorporate new prefix", "NetworkInterface", networkInterfaceName, "Node", nodeName, "Prefix", route.DestinationCIDR)
-						if err := o.ironcoreClient.Patch(ctx, nic, client.MergeFrom(nicBase)); err != nil {
+						if err := o.ironcoreClient.Patch(ctx, networkInterface, client.MergeFrom(nicBase)); err != nil {
 							return fmt.Errorf("failed to patch NetworkInterface %s for Node %s: %w", networkInterfaceName, nodeName, err)
 						}
 						klog.V(2).InfoS("Patch applied to NetworkInterface", "NetworkInterface", networkInterfaceName, "Prefix", route.DestinationCIDR)
@@ -170,9 +170,9 @@ func (o ironcoreRoutes) DeleteRoute(ctx context.Context, clusterName string, rou
 	for _, address := range route.TargetNodeAddresses {
 		if address.Type == corev1.NodeInternalIP {
 			klog.V(3).InfoS("Evaluating internal IP address for network interface match", "Node", nodeName, "Address", address.Address)
-			for _, networkInterface := range machine.Status.NetworkInterfaces {
+			for _, machineStatusNetworkInterface := range machine.Status.NetworkInterfaces {
 				interfaceFound := false
-				for _, p := range networkInterface.IPs {
+				for _, p := range machineStatusNetworkInterface.IPs {
 					if p.String() == address.Address {
 						interfaceFound = true
 						break
@@ -181,21 +181,21 @@ func (o ironcoreRoutes) DeleteRoute(ctx context.Context, clusterName string, rou
 
 				// If a matching network interface is found, attempt to remove the prefix
 				if interfaceFound {
-					networkInterfaceName := getNetworkInterfaceName(machine, networkInterface)
-					nic := &networkingv1alpha1.NetworkInterface{}
-					if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: networkInterfaceName}, nic); err != nil {
+					networkInterfaceName := machineStatusNetworkInterface.NetworkInterfaceRef.Name
+					networkInterface := &networkingv1alpha1.NetworkInterface{}
+					if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: networkInterfaceName}, networkInterface); err != nil {
 						return err
 					}
 
 					// Check for the prefix in the network interface's spec and remove it if present
-					for i, prefix := range nic.Spec.Prefixes {
+					for i, prefix := range networkInterface.Spec.Prefixes {
 						if prefix.Value.String() == route.DestinationCIDR {
-							nicBase := nic.DeepCopy()
-							nic.Spec.Prefixes = append(nic.Spec.Prefixes[:i], nic.Spec.Prefixes[i+1:]...)
-							klog.V(2).InfoS("Prefix identified and marked for removal", "Prefix", prefix.Value.String(), "UpdatedPrefixes", nic.Spec.Prefixes)
+							nicBase := networkInterface.DeepCopy()
+							networkInterface.Spec.Prefixes = append(networkInterface.Spec.Prefixes[:i], networkInterface.Spec.Prefixes[i+1:]...)
+							klog.V(2).InfoS("Prefix identified and marked for removal", "Prefix", prefix.Value.String(), "UpdatedPrefixes", networkInterface.Spec.Prefixes)
 
-							if err := o.ironcoreClient.Patch(ctx, nic, client.MergeFrom(nicBase)); err != nil {
-								return fmt.Errorf("failed to patch NetworkInterface %s for Node %s: %w", client.ObjectKeyFromObject(nic), nodeName, err)
+							if err := o.ironcoreClient.Patch(ctx, networkInterface, client.MergeFrom(nicBase)); err != nil {
+								return fmt.Errorf("failed to patch NetworkInterface %s for Node %s: %w", client.ObjectKeyFromObject(networkInterface), nodeName, err)
 							}
 							klog.V(2).InfoS("Prefix removal patch applied", "NetworkInterface", networkInterfaceName, "Node", nodeName)
 							break
@@ -210,17 +210,6 @@ func (o ironcoreRoutes) DeleteRoute(ctx context.Context, clusterName string, rou
 
 	klog.V(2).InfoS("Route deletion completed", "Cluster", clusterName, "Route", route)
 	return nil
-}
-
-func getNetworkInterfaceName(machine *computev1alpha1.Machine, networkInterface computev1alpha1.NetworkInterfaceStatus) string {
-	for _, nic := range machine.Spec.NetworkInterfaces {
-		if nic.Name == networkInterface.Name {
-			if nic.NetworkInterfaceRef != nil {
-				return nic.NetworkInterfaceRef.Name
-			}
-		}
-	}
-	return fmt.Sprintf("%s-%s", machine.Name, networkInterface.Name)
 }
 
 func (o ironcoreRoutes) getTargetNodeAddresses(ctx context.Context, nodeName string) ([]corev1.NodeAddress, error) {

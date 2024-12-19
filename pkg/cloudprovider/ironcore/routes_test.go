@@ -379,12 +379,14 @@ var _ = Describe("Routes", func() {
 		machine.Status.State = computev1alpha1.MachineStateRunning
 		machine.Status.NetworkInterfaces = []computev1alpha1.NetworkInterfaceStatus{
 			{
-				Name: "primary",
-				IPs:  []commonv1alpha1.IP{commonv1alpha1.MustParseIP("100.0.0.1")},
+				Name:                "primary",
+				IPs:                 []commonv1alpha1.IP{commonv1alpha1.MustParseIP("100.0.0.1")},
+				NetworkInterfaceRef: corev1.LocalObjectReference{Name: staticNetworkInterface.Name},
 			},
 			{
-				Name: "ephemeral",
-				IPs:  []commonv1alpha1.IP{commonv1alpha1.MustParseIP("192.168.0.1")},
+				Name:                "ephemeral",
+				IPs:                 []commonv1alpha1.IP{commonv1alpha1.MustParseIP("192.168.0.1")},
+				NetworkInterfaceRef: corev1.LocalObjectReference{Name: ephemeralNetworkInterface.Name},
 			},
 		}
 		Expect(k8sClient.Patch(ctx, machine, client.MergeFrom(machineBase))).To(Succeed())
