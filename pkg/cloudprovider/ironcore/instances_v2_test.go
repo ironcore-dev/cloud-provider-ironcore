@@ -77,18 +77,26 @@ var _ = Describe("InstancesV2", func() {
 		Expect(k8sClient.Create(ctx, netInterface)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, netInterface)
 
+		By("patching the network interface status to indicate availability and correct binding")
+		networkInterfaceBase := netInterface.DeepCopy()
+		netInterface.Status.State = networkingv1alpha1.NetworkInterfaceStateAvailable
+		netInterface.Status.IPs = []commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.1")}
+		netInterface.Status.VirtualIP = &commonv1alpha1.IP{Addr: netip.MustParseAddr("10.0.0.10")}
+		Expect(k8sClient.Status().Patch(ctx, netInterface, client.MergeFrom(networkInterfaceBase))).To(Succeed())
+
 		By("patching the machine object to have a valid network interface ref, virtual IP and internal IP address")
 		machineBase := machine.DeepCopy()
 		machine.Spec.NetworkInterfaces[0].NetworkInterfaceSource = computev1alpha1.NetworkInterfaceSource{
 			NetworkInterfaceRef: &corev1.LocalObjectReference{
-				Name: fmt.Sprintf("%s-my-nic", machine.Name),
+				Name: netInterface.Name,
 			},
 		}
 		machine.Status.State = computev1alpha1.MachineStateRunning
 		machine.Status.NetworkInterfaces = []computev1alpha1.NetworkInterfaceStatus{{
-			Name:      "my-nic",
-			IPs:       []commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.1")},
-			VirtualIP: &commonv1alpha1.IP{Addr: netip.MustParseAddr("10.0.0.10")},
+			Name: "my-nic",
+			NetworkInterfaceRef: corev1.LocalObjectReference{
+				Name: fmt.Sprintf("%s-my-nic", machine.Name),
+			},
 		}}
 		Expect(k8sClient.Patch(ctx, machine, client.MergeFrom(machineBase))).To(Succeed())
 
