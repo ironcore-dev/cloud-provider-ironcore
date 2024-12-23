@@ -143,7 +143,7 @@ var _ = Describe("LoadBalancer", func() {
 		}()
 
 		By("ensuring load balancer for service")
-		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().To(BeNil())
+		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().ToNot(HaveOccurred())
 
 		By("ensuring the load balancer type is public and load balancer status has public IP")
 		Eventually(Object(loadBalancer)).Should(SatisfyAll(
@@ -291,7 +291,7 @@ var _ = Describe("LoadBalancer", func() {
 		}()
 
 		By("ensuring load balancer for service")
-		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().To(BeNil())
+		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().ToNot(HaveOccurred())
 
 		By("ensuring the load balancer type is internal and load balancer status has internal IP")
 		Eventually(Object(loadBalancer)).Should(SatisfyAll(
@@ -313,7 +313,7 @@ var _ = Describe("LoadBalancer", func() {
 		}()
 
 		By("ensuring load balancer for service")
-		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().To(BeNil())
+		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().ToNot(HaveOccurred())
 
 		By("ensuring the load balancer type is public and load balancer status has public IP")
 		Eventually(Object(loadBalancer)).Should(SatisfyAll(
@@ -496,7 +496,7 @@ var _ = Describe("LoadBalancer", func() {
 		}()
 
 		By("ensuring load balancer for service")
-		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().To(BeNil())
+		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().ToNot(HaveOccurred())
 
 		By("ensuring the load balancer type is public and load balancer status has public IP")
 		Eventually(Object(loadBalancer)).Should(SatisfyAll(
@@ -784,7 +784,7 @@ var _ = Describe("LoadBalancer", func() {
 		}()
 
 		By("ensuring load balancer for service")
-		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().To(BeNil())
+		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().ToNot(HaveOccurred())
 
 		By("ensuring the load balancer type is public and load balancer status has public IP")
 		Eventually(Object(loadBalancer)).Should(SatisfyAll(
