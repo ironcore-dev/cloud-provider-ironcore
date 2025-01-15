@@ -113,14 +113,19 @@ func (o *ironcoreInstancesV2) InstanceMetadata(ctx context.Context, node *corev1
 	}
 
 	addresses := make([]corev1.NodeAddress, 0)
-	for _, iface := range machine.Status.NetworkInterfaces {
-		if iface.VirtualIP != nil {
+	for _, machineStatusNetworkInterface := range machine.Status.NetworkInterfaces {
+		networkInterfaceName := machineStatusNetworkInterface.NetworkInterfaceRef.Name
+		networkInterface := &networkingv1alpha1.NetworkInterface{}
+		if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: networkInterfaceName}, networkInterface); err != nil {
+			return nil, fmt.Errorf("failed to retrieve NetworkInterface %s: %w", networkInterfaceName, err)
+		}
+		if networkInterface.Status.VirtualIP != nil {
 			addresses = append(addresses, corev1.NodeAddress{
 				Type:    corev1.NodeExternalIP,
-				Address: iface.VirtualIP.String(),
+				Address: networkInterface.Status.VirtualIP.String(),
 			})
 		}
-		for _, ip := range iface.IPs {
+		for _, ip := range networkInterface.Status.IPs {
 			addresses = append(addresses, corev1.NodeAddress{
 				Type:    corev1.NodeInternalIP,
 				Address: ip.String(),
