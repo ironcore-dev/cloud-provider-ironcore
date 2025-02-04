@@ -12,10 +12,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog/v2"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -157,6 +159,12 @@ func (o *ironcoreLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNa
 			NetworkRef: v1.LocalObjectReference{
 				Name: o.cloudConfig.NetworkName,
 			},
+			NetworkInterfaceSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					LabelKeyClusterName: clusterName,
+				},
+			},
+
 			Ports: lbPorts,
 		},
 	}
@@ -238,7 +246,7 @@ func waitLoadBalancerActive(ctx context.Context, ironcoreClient client.Client, e
 }
 
 func (o *ironcoreLoadBalancer) applyLoadBalancerRoutingForLoadBalancer(ctx context.Context, loadBalancer *networkingv1alpha1.LoadBalancer, nodes []*v1.Node) error {
-	loadBalacerDestinations, err := o.getLoadBalancerDestinationsForNodes(ctx, nodes, loadBalancer.Spec.NetworkRef.Name)
+	loadBalacerDestinations, err := o.getLoadBalancerDestinationsForNodes(ctx, nodes, loadBalancer)
 	if err != nil {
 		return fmt.Errorf("failed to get NetworkInterfaces for Nodes: %w", err)
 	}
@@ -275,7 +283,7 @@ func (o *ironcoreLoadBalancer) applyLoadBalancerRoutingForLoadBalancer(ctx conte
 	return nil
 }
 
-func (o *ironcoreLoadBalancer) getLoadBalancerDestinationsForNodes(ctx context.Context, nodes []*v1.Node, networkName string) ([]networkingv1alpha1.LoadBalancerDestination, error) {
+func (o *ironcoreLoadBalancer) getLoadBalancerDestinationsForNodes(ctx context.Context, nodes []*v1.Node, lb *networkingv1alpha1.LoadBalancer) ([]networkingv1alpha1.LoadBalancerDestination, error) {
 	var loadbalancerDestinations []networkingv1alpha1.LoadBalancerDestination
 	for _, node := range nodes {
 		machineName := extractMachineNameFromProviderID(node.Spec.ProviderID)
@@ -297,8 +305,20 @@ func (o *ironcoreLoadBalancer) getLoadBalancerDestinationsForNodes(ctx context.C
 			}
 
 			// If the NetworkInterface is not part of Network we continue
-			if networkInterface.Spec.NetworkRef.Name != networkName {
+			if networkInterface.Spec.NetworkRef.Name != lb.Spec.NetworkRef.Name {
 				continue
+			}
+			// Check if the network interface matches the LoadBalancer's NetworkInterfaceSelector labels
+			if lb.Spec.NetworkInterfaceSelector != nil {
+				selector, err := metav1.LabelSelectorAsSelector(lb.Spec.NetworkInterfaceSelector)
+				if err != nil {
+					return nil, fmt.Errorf("invalid label selector in LoadBalancer %s: %w", lb.Name, err)
+				}
+
+				// If the NIC labels don't match the selector, skip this NIC
+				if !selector.Matches(labels.Set(networkInterface.Labels)) {
+					continue
+				}
 			}
 
 			// Create a LoadBalancerDestination for every NetworkInterface IP
@@ -349,7 +369,7 @@ func (o *ironcoreLoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterNa
 	}
 
 	klog.V(2).InfoS("Updating LoadBalancerRouting destinations for LoadBalancer", "LoadBalancerRouting", client.ObjectKeyFromObject(loadBalancerRouting), "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
-	loadBalancerDestinations, err := o.getLoadBalancerDestinationsForNodes(ctx, nodes, loadBalancer.Spec.NetworkRef.Name)
+	loadBalancerDestinations, err := o.getLoadBalancerDestinationsForNodes(ctx, nodes, loadBalancer)
 	if err != nil {
 		return fmt.Errorf("failed to get NetworkInterfaces for LoadBalancer %s: %w", client.ObjectKeyFromObject(loadBalancer), err)
 	}
