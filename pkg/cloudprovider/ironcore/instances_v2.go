@@ -126,17 +126,6 @@ func (o *ironcoreInstancesV2) InstanceMetadata(ctx context.Context, node *corev1
 			})
 		}
 		for _, ip := range networkInterface.Status.IPs {
-			addresses = append(addresses, corev1.NodeAddress{
-				Type:    corev1.NodeInternalIP,
-				Address: ip.String(),
-			})
-		}
-		// TODO remove once the ip handling above has been fixed in ironcore-controller-manager
-		nic := &networkingv1alpha1.NetworkInterface{}
-		if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: iface.NetworkInterfaceRef.Name}, nic); err != nil {
-			return nil, fmt.Errorf("failed to get network interface %s for machine %s: %w", client.ObjectKeyFromObject(nic), machine.Name, err)
-		}
-		for _, ip := range nic.Status.IPs {
 			if ip.Is6() {
 				addresses = append(addresses, corev1.NodeAddress{
 					Type:    corev1.NodeExternalIP,
