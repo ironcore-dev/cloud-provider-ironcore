@@ -3,12 +3,14 @@ module github.com/ironcore-dev/cloud-provider-ironcore
 go 1.23.0
 
 require (
+	github.com/gardener/aws-ipam-controller v0.2.0
 	github.com/ironcore-dev/controller-utils v0.9.7
 	github.com/ironcore-dev/ironcore v0.2.2-0.20241219142352-bf1d9998cc71
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/pflag v1.0.6
+	google.golang.org/grpc v1.69.0
 	k8s.io/api v0.31.4
 	k8s.io/apimachinery v0.31.4
 	k8s.io/client-go v0.31.4
@@ -16,6 +18,7 @@ require (
 	k8s.io/component-base v0.31.4
 	k8s.io/controller-manager v0.31.0
 	k8s.io/klog/v2 v2.130.1
+	k8s.io/utils v0.0.0-20241210054802-24370beab758
 	sigs.k8s.io/controller-runtime v0.19.4
 	sigs.k8s.io/yaml v1.4.0
 )
@@ -102,7 +105,6 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241015192408-796eee8c2d53 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241015192408-796eee8c2d53 // indirect
-	google.golang.org/grpc v1.69.0 // indirect
 	google.golang.org/protobuf v1.36.1 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
@@ -115,7 +117,6 @@ require (
 	k8s.io/kms v0.32.0 // indirect
 	k8s.io/kube-aggregator v0.31.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20241212222426-2c72e554b1e7 // indirect
-	k8s.io/utils v0.0.0-20241210054802-24370beab758 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.0 // indirect
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.5.0 // indirect
