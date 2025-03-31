@@ -42,12 +42,7 @@ var _ = Describe("InstancesV2", func() {
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
 				MachinePoolRef:  &corev1.LocalObjectReference{Name: "zone1"},
 				Image:           "my-image:latest",
-				NetworkInterfaces: []computev1alpha1.NetworkInterface{
-					{
-						Name: "my-nic",
-					},
-				},
-				Volumes: []computev1alpha1.Volume{},
+				Volumes:         []computev1alpha1.Volume{},
 			},
 		}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
@@ -86,9 +81,14 @@ var _ = Describe("InstancesV2", func() {
 
 		By("patching the machine object to have a valid network interface ref, virtual IP and internal IP address")
 		machineBase := machine.DeepCopy()
-		machine.Spec.NetworkInterfaces[0].NetworkInterfaceSource = computev1alpha1.NetworkInterfaceSource{
-			NetworkInterfaceRef: &corev1.LocalObjectReference{
-				Name: netInterface.Name,
+		machine.Spec.NetworkInterfaces = []computev1alpha1.NetworkInterface{
+			{
+				Name: "my-nic",
+				NetworkInterfaceSource: computev1alpha1.NetworkInterfaceSource{
+					NetworkInterfaceRef: &corev1.LocalObjectReference{
+						Name: netInterface.Name,
+					},
+				},
 			},
 		}
 		machine.Status.State = computev1alpha1.MachineStateRunning
