@@ -82,7 +82,7 @@ func (o *ironcoreLoadBalancer) getLoadBalancerName(ctx context.Context, clusterN
 
 	if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: legacyLoadBalancerName}, existingLoadBalancer); err != nil {
 		if apierrors.IsNotFound(err) {
-			return strings.Replace(string(service.UID), "-", "", -1), nil
+			return strings.ReplaceAll(string(service.UID), "-", ""), nil
 		}
 		return "", err
 	}
