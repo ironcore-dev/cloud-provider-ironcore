@@ -66,7 +66,7 @@ var _ = Describe("Routes", func() {
 	It("should list Routes for all network interfaces in current network", func(ctx SpecContext) {
 		By("patching the machine with cluster name label")
 		baseMachine := machine.DeepCopy()
-		machine.ObjectMeta.Labels = map[string]string{LabelKeyClusterName: clusterName}
+		machine.Labels = map[string]string{LabelKeyClusterName: clusterName}
 		Expect(k8sClient.Status().Patch(ctx, machine, client.MergeFrom(baseMachine))).To(Succeed())
 
 		By("creating a static network interface for machine")
@@ -294,7 +294,7 @@ var _ = Describe("Routes", func() {
 	It("should ensure that a prefix has been created for a route", func(ctx SpecContext) {
 		By("patching the machine with cluster name label")
 		baseMachine := machine.DeepCopy()
-		machine.ObjectMeta.Labels = map[string]string{LabelKeyClusterName: clusterName}
+		machine.Labels = map[string]string{LabelKeyClusterName: clusterName}
 		Expect(k8sClient.Status().Patch(ctx, machine, client.MergeFrom(baseMachine))).To(Succeed())
 
 		By("creating a static network interface for machine")

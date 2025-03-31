@@ -115,7 +115,7 @@ func (o ironcoreRoutes) CreateRoute(ctx context.Context, clusterName string, nam
 					// Check if the prefix already exists in the network interface
 					prefixExists := false
 					for _, prefix := range networkInterface.Status.Prefixes {
-						if prefix.Prefix.String() == route.DestinationCIDR {
+						if prefix.String() == route.DestinationCIDR {
 							prefixExists = true
 							break
 						}

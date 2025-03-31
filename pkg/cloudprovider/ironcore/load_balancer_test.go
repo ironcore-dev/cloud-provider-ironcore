@@ -10,7 +10,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	cloudprovider "k8s.io/cloud-provider"
@@ -766,7 +765,7 @@ var _ = Describe("LoadBalancer", func() {
 			Spec: networkingv1alpha1.LoadBalancerSpec{
 				Type:       networkingv1alpha1.LoadBalancerTypePublic,
 				IPFamilies: service.Spec.IPFamilies,
-				NetworkRef: v1.LocalObjectReference{
+				NetworkRef: corev1.LocalObjectReference{
 					Name: network.Name,
 				},
 				Ports: lbPorts,
