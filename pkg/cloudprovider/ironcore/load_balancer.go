@@ -186,7 +186,7 @@ func (o *ironcoreLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNa
 		}
 	}
 	// If loadbalancerWithNicSelector is set to true then add NetworkInterfaceSelector to loadbalancer.SPec
-	if loadbalancerWithNicSelector {
+	if o.loadbalancerWithNicSelector {
 		loadBalancer.Spec.NetworkInterfaceSelector = &metav1.LabelSelector{
 			MatchLabels: map[string]string{
 				LabelKeyClusterName: clusterName,
@@ -202,7 +202,7 @@ func (o *ironcoreLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNa
 
 	// if loadbalancerWithNicSelector is set to false then cloudProvider has to create the loadbalancerRouting
 	// if loadbalancerWithNicSelector is set to true then Ironcore will take care of creating the loadbalancerRouting
-	if !loadbalancerWithNicSelector {
+	if !o.loadbalancerWithNicSelector {
 		klog.V(2).InfoS("Applying LoadBalancerRouting for LoadBalancer", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
 		if err := o.applyLoadBalancerRoutingForLoadBalancer(ctx, loadBalancer, nodes); err != nil {
 			return nil, err
@@ -356,7 +356,7 @@ func (o *ironcoreLoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterNa
 	if err := o.ironcoreClient.Get(ctx, loadBalancerKey, loadBalancer); err != nil {
 		return fmt.Errorf("failed to get LoadBalancer %s: %w", client.ObjectKeyFromObject(loadBalancer), err)
 	}
-	if !loadbalancerWithNicSelector {
+	if !o.loadbalancerWithNicSelector {
 		loadBalancerRouting := &networkingv1alpha1.LoadBalancerRouting{}
 		loadBalancerRoutingKey := client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancerName}
 		if err := o.ironcoreClient.Get(ctx, loadBalancerRoutingKey, loadBalancerRouting); err != nil {
