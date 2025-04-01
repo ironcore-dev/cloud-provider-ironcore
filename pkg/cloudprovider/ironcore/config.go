@@ -29,11 +29,13 @@ type CloudConfig struct {
 }
 
 var (
-	IroncoreKubeconfigPath string
+	IroncoreKubeconfigPath      string
+	loadbalancerWithNicSelector bool
 )
 
 func AddExtraFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&IroncoreKubeconfigPath, "ironcore-kubeconfig", "", "Path to the ironcore kubeconfig.")
+	fs.BoolVar(&loadbalancerWithNicSelector, "loadbalancer-with-nicselector", true, "loadbalancerSpec with networkinterfaceSelector having networkinterfaces labeled with LabelKeyClusterName: clusterName")
 }
 
 func LoadCloudProviderConfig(f io.Reader) (*cloudProviderConfig, error) {
