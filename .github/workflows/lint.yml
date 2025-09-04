@@ -15,4 +15,6 @@ jobs:
         with:
           go-version-file: 'go.mod'
       - name: golangci-lint
-        run: make lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.4
