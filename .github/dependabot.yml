@@ -4,31 +4,35 @@ updates:
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     reviewers:
       - "ironcore-dev/integration"
-    # Ignore K8 packages as these are done manually
+    groups:
+      go-dependencies:
+        patterns:
+          - "*"
     ignore:
-      - dependency-name: "k8s.io/api"
-      - dependency-name: "k8s.io/apiextensions-apiserver"
-      - dependency-name: "k8s.io/apimachinery"
-      - dependency-name: "k8s.io/apiserver"
-      - dependency-name: "k8s.io/client-go"
-      - dependency-name: "k8s.io/component-base"
-      - dependency-name: "k8s.io/kube-aggregator"
-      - dependency-name: "k8s.io/kubectl"
-      - dependency-name: "k8s.io/cloud-provider"
-      - dependency-name: "k8s.io/controller-manager"
-      - dependency-name: "sigs.k8s.io/controller-runtime"
+      - dependency-name: "k8s.io/*"
+      - dependency-name: "sigs.k8s.io/*"
+      - dependency-name: "github.com/ironcore-dev/ironcore"
+      - dependency-name: "github.com/ironcore-dev/controller-utils"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     reviewers:
       - "ironcore-dev/integration"
+    groups:
+      gh-actions-dependencies:
+        patterns:
+          - "*"
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     reviewers:
       - "ironcore-dev/integration"
+    groups:
+      docker-dependencies:
+        patterns:
+          - "*"
