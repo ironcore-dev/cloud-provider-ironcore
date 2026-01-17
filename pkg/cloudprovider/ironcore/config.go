@@ -23,9 +23,9 @@ type cloudProviderConfig struct {
 }
 
 type CloudConfig struct {
-	NetworkName string `json:"networkName"`
-	PrefixName  string `json:"prefixName,omitempty"`
-	ClusterName string `json:"clusterName"`
+	NetworkName string   `json:"networkName"`
+	PrefixNames []string `json:"prefixNames,omitempty"`
+	ClusterName string   `json:"clusterName"`
 }
 
 var (
@@ -68,9 +68,6 @@ func LoadCloudProviderConfig(f io.Reader) (*cloudProviderConfig, error) {
 		return nil, fmt.Errorf("unable to read ironcore cluster kubeconfig: %w", err)
 	}
 	clientConfig := clientcmd.NewDefaultClientConfig(*ironcoreKubeconfig, nil)
-	if err != nil {
-		return nil, fmt.Errorf("unable to serialize ironcore cluster kubeconfig: %w", err)
-	}
 	restConfig, err := clientConfig.ClientConfig()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get ironcore cluster rest config: %w", err)

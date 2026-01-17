@@ -126,10 +126,18 @@ func (o *ironcoreInstancesV2) InstanceMetadata(ctx context.Context, node *corev1
 			})
 		}
 		for _, ip := range networkInterface.Status.IPs {
-			addresses = append(addresses, corev1.NodeAddress{
-				Type:    corev1.NodeInternalIP,
-				Address: ip.String(),
-			})
+			if ip.Is6() {
+				addresses = append(addresses, corev1.NodeAddress{
+					Type:    corev1.NodeExternalIP,
+					Address: ip.String(),
+				})
+			}
+			if ip.Is4() {
+				addresses = append(addresses, corev1.NodeAddress{
+					Type:    corev1.NodeInternalIP,
+					Address: ip.String(),
+				})
+			}
 		}
 	}
 

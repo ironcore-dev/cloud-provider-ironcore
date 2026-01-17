@@ -9,6 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -166,24 +169,30 @@ func (o *ironcoreLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNa
 
 	// if load balancer type is Internal then update IPSource with valid prefix template
 	if desiredLoadBalancerType == networkingv1alpha1.LoadBalancerTypeInternal {
-		if o.cloudConfig.PrefixName == "" {
-			return nil, fmt.Errorf("prefixName is not defined in config")
+		if len(o.cloudConfig.PrefixNames) == 0 {
+			return nil, fmt.Errorf("prefixNames is not defined in config")
 		}
-		loadBalancer.Spec.IPs = []networkingv1alpha1.IPSource{
-			{
+		var ips []networkingv1alpha1.IPSource
+		for _, prefixName := range o.cloudConfig.PrefixNames {
+			prefix := &ipamv1alpha1.Prefix{}
+			if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Name: prefixName, Namespace: o.ironcoreNamespace}, prefix); err != nil {
+				return nil, status.Error(codes.Internal, fmt.Sprintf("error getting prefix %s:%s", prefixName, err.Error()))
+			}
+			ipSource := networkingv1alpha1.IPSource{
 				Ephemeral: &networkingv1alpha1.EphemeralPrefixSource{
 					PrefixTemplate: &ipamv1alpha1.PrefixTemplateSpec{
 						Spec: ipamv1alpha1.PrefixSpec{
-							// TODO: for now we only support IPv4 until Gardener has support for IPv6 based Shoots
-							IPFamily: v1.IPv4Protocol,
+							IPFamily: prefix.Spec.IPFamily,
 							ParentRef: &v1.LocalObjectReference{
-								Name: o.cloudConfig.PrefixName,
+								Name: prefix.Name,
 							},
 						},
 					},
 				},
-			},
+			}
+			ips = append(ips, ipSource)
 		}
+		loadBalancer.Spec.IPs = ips
 	}
 	// If useNicSelector is set to true then add NetworkInterfaceSelector to loadbalancer.SPec
 	if o.useNicSelector {
