@@ -16,7 +16,7 @@ import (
 
 var _ = Describe("Config", func() {
 	It("should load a correct provider config", func() {
-		sampleConfig := map[string]string{"networkName": "my-network", "prefixName": "my-prefix", "clusterName": "my-cluster"}
+		sampleConfig := map[string]any{"networkName": "my-network", "prefixNames": []string{"my-prefix"}, "clusterName": "my-cluster"}
 		sampleConfigData, err := yaml.Marshal(sampleConfig)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -59,12 +59,12 @@ var _ = Describe("Config", func() {
 		Expect(config.RestConfig).NotTo(BeNil())
 		Expect(config.Namespace).To(Equal("test"))
 		Expect(config.cloudConfig.NetworkName).To(Equal("my-network"))
-		Expect(config.cloudConfig.PrefixName).To(Equal("my-prefix"))
+		Expect(config.cloudConfig.PrefixNames).To(Equal([]string{"my-prefix"}))
 		Expect(config.cloudConfig.ClusterName).To(Equal("my-cluster"))
 	})
 
 	It("should get the default namespace if no namespace was defined for an auth context", func() {
-		sampleConfig := map[string]string{"networkName": "my-network", "prefixName": "my-prefix", "clusterName": "my-cluster"}
+		sampleConfig := map[string]any{"networkName": "my-network", "prefixNames": []string{"my-prefix"}, "clusterName": "my-cluster"}
 		sampleConfigData, err := yaml.Marshal(sampleConfig)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -109,7 +109,7 @@ var _ = Describe("Config", func() {
 		// as an error.
 		Expect(config.Namespace).To(Equal("default"))
 		Expect(config.cloudConfig.NetworkName).To(Equal("my-network"))
-		Expect(config.cloudConfig.PrefixName).To(Equal("my-prefix"))
+		Expect(config.cloudConfig.PrefixNames).To(Equal([]string{"my-prefix"}))
 		Expect(config.cloudConfig.ClusterName).To(Equal("my-cluster"))
 	})
 
