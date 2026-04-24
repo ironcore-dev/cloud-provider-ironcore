@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ironcore-dev/ironcore/api/common/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	cloudprovider "k8s.io/cloud-provider"
@@ -138,17 +139,21 @@ func (o *ironcoreInstancesV2) InstanceMetadata(ctx context.Context, node *corev1
 		providerID = fmt.Sprintf("%s://%s/%s", ProviderName, o.ironcoreNamespace, machine.Name)
 	}
 
-	zone := ""
-	if machine.Spec.MachinePoolRef != nil {
-		zone = machine.Spec.MachinePoolRef.Name
+	pool := &computev1alpha1.MachinePool{}
+	if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Name: machine.Spec.MachinePoolRef.Name}, pool); err != nil {
+		return nil, fmt.Errorf("failed to get machine pool %s for machine %s: %w", machine.Spec.MachinePoolRef.Name, machine.Name, err)
 	}
 
-	// TODO: handle region
+	zone, ok := pool.Annotations[string(v1alpha1.TopologyLabelZone)]
+	if !ok {
+		zone = pool.Name
+	}
+
 	return &cloudprovider.InstanceMetadata{
 		ProviderID:    providerID,
 		InstanceType:  machine.Spec.MachineClassRef.Name,
 		NodeAddresses: addresses,
 		Zone:          zone,
-		Region:        "",
+		Region:        pool.Annotations[string(v1alpha1.TopologyLabelRegion)],
 	}, nil
 }

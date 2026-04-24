@@ -1,15 +1,12 @@
-name: Pull Request Code test
+name: Tests
 
 on:
   pull_request:
     types: [ assigned, opened, synchronize, reopened ]
-    paths-ignore:
-      - 'docs/**'
-      - '**/*.md'
 
 jobs:
-  checks:
-    name: run
+  test:
+    name: Run tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
