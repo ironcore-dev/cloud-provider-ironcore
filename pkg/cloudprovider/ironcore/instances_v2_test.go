@@ -212,17 +212,17 @@ var _ = Describe("InstancesV2", func() {
 		Expect(ok).To(BeFalse())
 	})
 
-	It("should return zone and region from machine pool annotations", func(ctx SpecContext) {
+	It("should return zone and region from machine pool labels", func(ctx SpecContext) {
 		By("instantiating the instances v2 provider")
 		var ok bool
 		instancesProvider, ok = (*cp).InstancesV2()
 		Expect(ok).To(BeTrue())
 
-		By("creating a machine pool with zone and region annotations")
+		By("creating a machine pool with zone and region labels")
 		machinePool := &computev1alpha1.MachinePool{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pool-with-zone-region",
-				Annotations: map[string]string{
+				Labels: map[string]string{
 					string(commonv1alpha1.TopologyLabelZone):   "eu-west-1a",
 					string(commonv1alpha1.TopologyLabelRegion): "eu-west-1",
 				},
@@ -231,7 +231,7 @@ var _ = Describe("InstancesV2", func() {
 		Expect(k8sClient.Create(ctx, machinePool)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, machinePool)
 
-		By("creating a machine referencing the annotated pool")
+		By("creating a machine referencing the labeled pool")
 		machine := &computev1alpha1.Machine{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
@@ -300,24 +300,24 @@ var _ = Describe("InstancesV2", func() {
 		Expect(k8sClient.Create(ctx, node)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, node)
 
-		By("ensuring that instance metadata returns zone and region from pool annotations")
+		By("ensuring that instance metadata returns zone and region from pool labels")
 		instanceMetadata, err := instancesProvider.InstanceMetadata(ctx, node)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(instanceMetadata.Zone).To(Equal("eu-west-1a"))
 		Expect(instanceMetadata.Region).To(Equal("eu-west-1"))
 	})
 
-	It("should return zone from annotation and empty region when only zone annotation is set", func(ctx SpecContext) {
+	It("should return zone from label and empty region when only zone label is set", func(ctx SpecContext) {
 		By("instantiating the instances v2 provider")
 		var ok bool
 		instancesProvider, ok = (*cp).InstancesV2()
 		Expect(ok).To(BeTrue())
 
-		By("creating a machine pool with only zone annotation")
+		By("creating a machine pool with only zone label")
 		machinePool := &computev1alpha1.MachinePool{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "pool-zone-only",
-				Annotations: map[string]string{
+				Labels: map[string]string{
 					string(commonv1alpha1.TopologyLabelZone): "us-east-1b",
 				},
 			},
@@ -394,7 +394,7 @@ var _ = Describe("InstancesV2", func() {
 		Expect(k8sClient.Create(ctx, node)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, node)
 
-		By("ensuring that instance metadata returns zone from annotation and empty region")
+		By("ensuring that instance metadata returns zone from label and empty region")
 		instanceMetadata, err := instancesProvider.InstanceMetadata(ctx, node)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(instanceMetadata.Zone).To(Equal("us-east-1b"))

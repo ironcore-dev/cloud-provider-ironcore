@@ -144,9 +144,19 @@ func (o *ironcoreInstancesV2) InstanceMetadata(ctx context.Context, node *corev1
 		return nil, fmt.Errorf("failed to get machine pool %s for machine %s: %w", machine.Spec.MachinePoolRef.Name, machine.Name, err)
 	}
 
-	zone, ok := pool.Annotations[string(v1alpha1.TopologyLabelZone)]
-	if !ok {
+	zone, ok := pool.Labels[string(v1alpha1.TopologyLabelZone)]
+	if ok {
+		klog.V(2).InfoS("Resolved zone from pool topology label", "Machine", machine.Name, "Pool", pool.Name, "Zone", zone)
+	} else {
 		zone = pool.Name
+		klog.V(2).InfoS("Pool topology label not found, deriving zone from pool name (legacy behavior)", "Machine", machine.Name, "Pool", pool.Name, "Zone", zone)
+	}
+
+	region := pool.Labels[string(v1alpha1.TopologyLabelRegion)]
+	if region != "" {
+		klog.V(2).InfoS("Resolved region from pool topology label", "Machine", machine.Name, "Pool", pool.Name, "Region", region)
+	} else {
+		klog.V(2).InfoS("Pool topology region label not found", "Machine", machine.Name, "Pool", pool.Name)
 	}
 
 	return &cloudprovider.InstanceMetadata{
@@ -154,6 +164,6 @@ func (o *ironcoreInstancesV2) InstanceMetadata(ctx context.Context, node *corev1
 		InstanceType:  machine.Spec.MachineClassRef.Name,
 		NodeAddresses: addresses,
 		Zone:          zone,
-		Region:        pool.Annotations[string(v1alpha1.TopologyLabelRegion)],
+		Region:        region,
 	}, nil
 }
