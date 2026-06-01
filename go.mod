@@ -12,9 +12,9 @@ require (
 	k8s.io/api v0.35.3
 	k8s.io/apimachinery v0.35.3
 	k8s.io/client-go v0.35.3
-	k8s.io/cloud-provider v0.32.3
+	k8s.io/cloud-provider v0.35.3
 	k8s.io/component-base v0.35.3
-	k8s.io/controller-manager v0.32.3
+	k8s.io/controller-manager v0.35.3
 	k8s.io/klog/v2 v2.130.1
 	sigs.k8s.io/controller-runtime v0.23.3
 	sigs.k8s.io/yaml v1.6.0
@@ -120,7 +120,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	k8s.io/apiextensions-apiserver v0.35.3 // indirect
 	k8s.io/apiserver v0.35.3 // indirect
-	k8s.io/component-helpers v0.32.3 // indirect
+	k8s.io/component-helpers v0.35.3 // indirect
 	k8s.io/kms v0.35.3 // indirect
 	k8s.io/kube-aggregator v0.35.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20260127142750-a19766b6e2d4 // indirect

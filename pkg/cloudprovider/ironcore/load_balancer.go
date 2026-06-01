@@ -228,6 +228,7 @@ func (o *ironcoreLoadBalancer) buildLoadBalancerApplyConfig(clusterName string, 
 							ipamv1alpha1ac.PrefixTemplateSpec().
 								WithSpec(
 									ipamv1alpha1ac.PrefixSpec().
+										// TODO: for now we only support IPv4 until Gardener has support for IPv6 based Shoots
 										WithIPFamily(v1.IPv4Protocol).
 										WithParentRef(
 											v1.LocalObjectReference{
@@ -352,7 +353,9 @@ func (o *ironcoreLoadBalancer) buildLoadBalancerRoutingApplyConfig(
 				WithAPIVersion(networkingv1alpha1.SchemeGroupVersion.String()).
 				WithKind("LoadBalancer").
 				WithName(loadBalancer.Name).
-				WithUID(loadBalancer.UID),
+				WithUID(loadBalancer.UID).
+				WithController(true).
+				WithBlockOwnerDeletion(true),
 		).
 		WithNetworkRef(
 			v1alpha1.LocalUIDReference{
