@@ -17,12 +17,14 @@ import (
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog/v2"
 
+	ipamv1alpha1ac "github.com/ironcore-dev/ironcore/client-go/applyconfigurations/ipam/v1alpha1"
+	networkingv1alpha1ac "github.com/ironcore-dev/ironcore/client-go/applyconfigurations/networking/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	commonv1alpha1 "github.com/ironcore-dev/ironcore/api/common/v1alpha1"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
+
+	"github.com/ironcore-dev/ironcore/api/common/v1alpha1"
 	computev1alpha1 "github.com/ironcore-dev/ironcore/api/compute/v1alpha1"
-	ipamv1alpha1 "github.com/ironcore-dev/ironcore/api/ipam/v1alpha1"
 	networkingv1alpha1 "github.com/ironcore-dev/ironcore/api/networking/v1alpha1"
 )
 
@@ -104,110 +106,54 @@ func (o *ironcoreLoadBalancer) GetLoadBalancerName(ctx context.Context, clusterN
 func (o *ironcoreLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	klog.V(2).InfoS("EnsureLoadBalancer for Service", "Cluster", clusterName, "Service", client.ObjectKeyFromObject(service))
 
-	// decide load balancer type based on service annotation for internal load balancer
-	var desiredLoadBalancerType networkingv1alpha1.LoadBalancerType
-	if value, ok := service.Annotations[InternalLoadBalancerAnnotation]; ok && value == "true" {
-		desiredLoadBalancerType = networkingv1alpha1.LoadBalancerTypeInternal
-	} else {
-		desiredLoadBalancerType = networkingv1alpha1.LoadBalancerTypePublic
-	}
+	desiredLoadBalancerType := o.getDesiredLoadBalancerType(service)
 
 	loadBalancerName, err := o.getLoadBalancerName(ctx, clusterName, service)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get LoadBalancer name for Service %s: %w", client.ObjectKeyFromObject(service), err)
 	}
 
-	// get existing load balancer type
-	existingLoadBalancer := &networkingv1alpha1.LoadBalancer{}
-	var existingLoadBalancerType networkingv1alpha1.LoadBalancerType
-	if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancerName}, existingLoadBalancer); err == nil {
-		existingLoadBalancerType = existingLoadBalancer.Spec.Type
-		if existingLoadBalancerType != desiredLoadBalancerType {
-			if err = o.EnsureLoadBalancerDeleted(ctx, clusterName, service); err != nil {
-				return nil, fmt.Errorf("failed deleting existing loadbalancer %s: %w", loadBalancerName, err)
-			}
-		}
+	existingLoadBalancerType, err := o.ensureLoadBalancerType(ctx, clusterName, service, loadBalancerName, desiredLoadBalancerType)
+	if err != nil {
+		return nil, err
 	}
 
-	klog.V(2).InfoS("Getting LoadBalancer ports from Service", "Service", client.ObjectKeyFromObject(service))
-	var lbPorts []networkingv1alpha1.LoadBalancerPort
-	for _, svcPort := range service.Spec.Ports {
-		protocol := svcPort.Protocol
-		lbPorts = append(lbPorts, networkingv1alpha1.LoadBalancerPort{
-			Protocol: &protocol,
-			Port:     svcPort.Port,
-		})
+	loadBalancerApplyConfig, err := o.buildLoadBalancerApplyConfig(clusterName, service, loadBalancerName, desiredLoadBalancerType)
+	if err != nil {
+		return nil, err
 	}
 
-	loadBalancer := &networkingv1alpha1.LoadBalancer{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "LoadBalancer",
-			APIVersion: networkingv1alpha1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      loadBalancerName,
-			Namespace: o.ironcoreNamespace,
-			Annotations: map[string]string{
-				AnnotationKeyClusterName:      clusterName,
-				AnnotationKeyServiceName:      service.Name,
-				AnnotationKeyServiceNamespace: service.Namespace,
-				AnnotationKeyServiceUID:       string(service.UID),
-			},
-		},
-		Spec: networkingv1alpha1.LoadBalancerSpec{
-			Type:       desiredLoadBalancerType,
-			IPFamilies: service.Spec.IPFamilies,
-			NetworkRef: v1.LocalObjectReference{
-				Name: o.cloudConfig.NetworkName,
-			},
-			Ports: lbPorts,
-		},
+	klog.V(2).InfoS("Applying LoadBalancer for Service", "LoadBalancer", client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancerName}, "Service", client.ObjectKeyFromObject(service))
+
+	if err := o.ironcoreClient.Apply(ctx, loadBalancerApplyConfig, client.FieldOwner(loadBalancerFieldOwner), client.ForceOwnership); err != nil {
+		return nil, fmt.Errorf("failed to apply LoadBalancer %s for Service %s: %w", client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancerName}, client.ObjectKeyFromObject(service), err)
 	}
 
-	// if load balancer type is Internal then update IPSource with valid prefix template
-	if desiredLoadBalancerType == networkingv1alpha1.LoadBalancerTypeInternal {
-		if o.cloudConfig.PrefixName == "" {
-			return nil, fmt.Errorf("prefixName is not defined in config")
-		}
-		loadBalancer.Spec.IPs = []networkingv1alpha1.IPSource{
-			{
-				Ephemeral: &networkingv1alpha1.EphemeralPrefixSource{
-					PrefixTemplate: &ipamv1alpha1.PrefixTemplateSpec{
-						Spec: ipamv1alpha1.PrefixSpec{
-							// TODO: for now we only support IPv4 until Gardener has support for IPv6 based Shoots
-							IPFamily: v1.IPv4Protocol,
-							ParentRef: &v1.LocalObjectReference{
-								Name: o.cloudConfig.PrefixName,
-							},
-						},
-					},
-				},
-			},
-		}
-	}
-	// If useNicSelector is set to true then add NetworkInterfaceSelector to loadbalancer.SPec
-	if o.useNicSelector {
-		loadBalancer.Spec.NetworkInterfaceSelector = &metav1.LabelSelector{
-			MatchLabels: map[string]string{
-				LabelKeyClusterName: clusterName,
-			},
-		}
-	}
-
-	klog.V(2).InfoS("Applying LoadBalancer for Service", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer), "Service", client.ObjectKeyFromObject(service))
-	if err := o.ironcoreClient.Patch(ctx, loadBalancer, client.Apply, loadBalancerFieldOwner, client.ForceOwnership); err != nil {
-		return nil, fmt.Errorf("failed to apply LoadBalancer %s for Service %s: %w", client.ObjectKeyFromObject(loadBalancer), client.ObjectKeyFromObject(service), err)
-	}
-	klog.V(2).InfoS("Applied LoadBalancer for Service", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer), "Service", client.ObjectKeyFromObject(service))
+	klog.V(2).InfoS("Applied LoadBalancer for Service", "LoadBalancer", client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancerName}, "Service", client.ObjectKeyFromObject(service))
 
 	// if useNicSelector is set to false then cloudProvider has to create the loadbalancerRouting
 	// if useNicSelector is set to true then Ironcore will take care of creating the loadbalancerRouting
 	if !o.useNicSelector {
-		klog.V(2).InfoS("Applying LoadBalancerRouting for LoadBalancer", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
-		if err := o.applyLoadBalancerRoutingForLoadBalancer(ctx, loadBalancer, nodes); err != nil {
+		loadBalancerToRoute := &networkingv1alpha1.LoadBalancer{}
+		loadBalancerKey := client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancerName}
+		if err := o.ironcoreClient.Get(ctx, loadBalancerKey, loadBalancerToRoute); err != nil {
+			return nil, fmt.Errorf("failed to get LoadBalancer %s for routing: %w", loadBalancerKey, err)
+		}
+
+		klog.V(2).InfoS("Applying LoadBalancerRouting for LoadBalancer", "LoadBalancer", client.ObjectKeyFromObject(loadBalancerToRoute))
+
+		if err := o.applyLoadBalancerRoutingForLoadBalancer(ctx, loadBalancerToRoute, nodes); err != nil {
 			return nil, err
 		}
-		klog.V(2).InfoS("Applied LoadBalancerRouting for LoadBalancer", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
+
+		klog.V(2).InfoS("Applied LoadBalancerRouting for LoadBalancer", "LoadBalancer", client.ObjectKeyFromObject(loadBalancerToRoute))
+	}
+
+	loadBalancer := &networkingv1alpha1.LoadBalancer{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      loadBalancerName,
+			Namespace: o.ironcoreNamespace,
+		},
 	}
 
 	lbStatus, err := waitLoadBalancerActive(ctx, o.ironcoreClient, existingLoadBalancerType, service, loadBalancer)
@@ -217,6 +163,103 @@ func (o *ironcoreLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNa
 	return &lbStatus, nil
 }
 
+func (o *ironcoreLoadBalancer) getDesiredLoadBalancerType(service *v1.Service) networkingv1alpha1.LoadBalancerType {
+	if value, ok := service.Annotations[InternalLoadBalancerAnnotation]; ok && value == "true" {
+		return networkingv1alpha1.LoadBalancerTypeInternal
+	}
+
+	return networkingv1alpha1.LoadBalancerTypePublic
+}
+
+func (o *ironcoreLoadBalancer) ensureLoadBalancerType(ctx context.Context, clusterName string, service *v1.Service, loadBalancerName string,
+	desiredType networkingv1alpha1.LoadBalancerType,
+) (networkingv1alpha1.LoadBalancerType, error) {
+	existingLoadBalancer := &networkingv1alpha1.LoadBalancer{}
+
+	if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancerName}, existingLoadBalancer); err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", nil
+		}
+
+		return "", err
+	}
+
+	existingType := existingLoadBalancer.Spec.Type
+
+	if existingType != desiredType {
+		if err := o.EnsureLoadBalancerDeleted(ctx, clusterName, service); err != nil {
+			return "", fmt.Errorf("failed deleting existing loadbalancer %s: %w", loadBalancerName, err)
+		}
+	}
+
+	return existingType, nil
+}
+
+func (o *ironcoreLoadBalancer) buildLoadBalancerApplyConfig(clusterName string, service *v1.Service, loadBalancerName string,
+	loadBalancerType networkingv1alpha1.LoadBalancerType,
+) (*networkingv1alpha1ac.LoadBalancerApplyConfiguration, error) {
+	lbPorts := make([]*networkingv1alpha1ac.LoadBalancerPortApplyConfiguration, 0, len(service.Spec.Ports))
+
+	for _, svcPort := range service.Spec.Ports {
+		protocol := svcPort.Protocol
+
+		lbPorts = append(lbPorts, networkingv1alpha1ac.LoadBalancerPort().
+			WithProtocol(protocol).
+			WithPort(svcPort.Port),
+		)
+	}
+
+	spec := networkingv1alpha1ac.LoadBalancerSpec().
+		WithType(loadBalancerType).
+		WithIPFamilies(service.Spec.IPFamilies...).
+		WithNetworkRef(v1.LocalObjectReference{Name: o.cloudConfig.NetworkName}).
+		WithPorts(lbPorts...)
+
+	if loadBalancerType == networkingv1alpha1.LoadBalancerTypeInternal {
+		if o.cloudConfig.PrefixName == "" {
+			return nil, fmt.Errorf("prefixName is not defined in config")
+		}
+
+		spec.WithIPs(
+			networkingv1alpha1ac.IPSource().
+				WithEphemeral(
+					networkingv1alpha1ac.EphemeralPrefixSource().
+						WithPrefixTemplate(
+							ipamv1alpha1ac.PrefixTemplateSpec().
+								WithSpec(
+									ipamv1alpha1ac.PrefixSpec().
+										WithIPFamily(v1.IPv4Protocol).
+										WithParentRef(
+											v1.LocalObjectReference{
+												Name: o.cloudConfig.PrefixName,
+											}),
+								),
+						),
+				),
+		)
+	}
+
+	if o.useNicSelector {
+		spec.WithNetworkInterfaceSelector(
+			metav1ac.LabelSelector().
+				WithMatchLabels(map[string]string{
+					LabelKeyClusterName: clusterName,
+				}),
+		)
+	}
+
+	return networkingv1alpha1ac.LoadBalancer(
+		loadBalancerName,
+		o.ironcoreNamespace,
+	).
+		WithAnnotations(map[string]string{
+			AnnotationKeyClusterName:      clusterName,
+			AnnotationKeyServiceName:      service.Name,
+			AnnotationKeyServiceNamespace: service.Namespace,
+			AnnotationKeyServiceUID:       string(service.UID),
+		}).
+		WithSpec(spec), nil
+}
 func waitLoadBalancerActive(ctx context.Context, ironcoreClient client.Client, existingLoadBalancerType networkingv1alpha1.LoadBalancerType,
 	service *v1.Service, loadBalancer *networkingv1alpha1.LoadBalancer) (v1.LoadBalancerStatus, error) {
 	klog.V(2).InfoS("Waiting for LoadBalancer instance to become ready", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
@@ -253,41 +296,70 @@ func waitLoadBalancerActive(ctx context.Context, ironcoreClient client.Client, e
 }
 
 func (o *ironcoreLoadBalancer) applyLoadBalancerRoutingForLoadBalancer(ctx context.Context, loadBalancer *networkingv1alpha1.LoadBalancer, nodes []*v1.Node) error {
-	loadBalacerDestinations, err := o.getLoadBalancerDestinationsForNodes(ctx, nodes, loadBalancer.Spec.NetworkRef.Name)
+	loadBalancerDestinations, err := o.getLoadBalancerDestinationsForNodes(ctx, nodes, loadBalancer.Spec.NetworkRef.Name)
 	if err != nil {
 		return fmt.Errorf("failed to get NetworkInterfaces for Nodes: %w", err)
 	}
 
 	network := &networkingv1alpha1.Network{}
-	networkKey := client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancer.Spec.NetworkRef.Name}
+	networkKey := client.ObjectKey{
+		Namespace: o.ironcoreNamespace,
+		Name:      loadBalancer.Spec.NetworkRef.Name,
+	}
+
 	if err := o.ironcoreClient.Get(ctx, networkKey, network); err != nil {
 		return fmt.Errorf("failed to get Network %s: %w", o.cloudConfig.NetworkName, err)
 	}
 
-	loadBalancerRouting := &networkingv1alpha1.LoadBalancerRouting{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "LoadBalancerRouting",
-			APIVersion: networkingv1alpha1.SchemeGroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      loadBalancer.Name,
-			Namespace: o.ironcoreNamespace,
-		},
-		NetworkRef: commonv1alpha1.LocalUIDReference{
-			Name: network.Name,
-			UID:  network.UID,
-		},
-		Destinations: loadBalacerDestinations,
+	loadBalancerRoutingApplyConfig := o.buildLoadBalancerRoutingApplyConfig(loadBalancer, network, loadBalancerDestinations)
+
+	if err := o.ironcoreClient.Apply(ctx, loadBalancerRoutingApplyConfig, client.FieldOwner(loadBalancerFieldOwner), client.ForceOwnership); err != nil {
+		return fmt.Errorf("failed to apply LoadBalancerRouting %s for LoadBalancer %s: %w", client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancer.Name}, client.ObjectKeyFromObject(loadBalancer), err)
 	}
 
-	if err := controllerutil.SetOwnerReference(loadBalancer, loadBalancerRouting, o.ironcoreClient.Scheme()); err != nil {
-		return fmt.Errorf("failed to set owner reference for load balancer routing %s: %w", client.ObjectKeyFromObject(loadBalancerRouting), err)
-	}
-
-	if err := o.ironcoreClient.Patch(ctx, loadBalancerRouting, client.Apply, loadBalancerFieldOwner, client.ForceOwnership); err != nil {
-		return fmt.Errorf("failed to apply LoadBalancerRouting %s for LoadBalancer %s: %w", client.ObjectKeyFromObject(loadBalancerRouting), client.ObjectKeyFromObject(loadBalancer), err)
-	}
 	return nil
+}
+
+func (o *ironcoreLoadBalancer) buildLoadBalancerRoutingApplyConfig(
+	loadBalancer *networkingv1alpha1.LoadBalancer,
+	network *networkingv1alpha1.Network,
+	destinations []networkingv1alpha1.LoadBalancerDestination,
+) *networkingv1alpha1ac.LoadBalancerRoutingApplyConfiguration {
+	destinationApplyConfigs := make([]*networkingv1alpha1ac.LoadBalancerDestinationApplyConfiguration, 0, len(destinations))
+
+	for _, destination := range destinations {
+		targetRef := networkingv1alpha1ac.LoadBalancerTargetRef().
+			WithName(destination.TargetRef.Name).
+			WithUID(destination.TargetRef.UID)
+		if destination.TargetRef.ProviderID != "" {
+			targetRef = targetRef.WithProviderID(destination.TargetRef.ProviderID)
+		}
+
+		destinationApplyConfigs = append(
+			destinationApplyConfigs,
+			networkingv1alpha1ac.LoadBalancerDestination().
+				WithIP(destination.IP).
+				WithTargetRef(targetRef),
+		)
+	}
+
+	return networkingv1alpha1ac.LoadBalancerRouting(
+		loadBalancer.Name,
+		o.ironcoreNamespace,
+	).
+		WithOwnerReferences(
+			metav1ac.OwnerReference().
+				WithAPIVersion(networkingv1alpha1.SchemeGroupVersion.String()).
+				WithKind("LoadBalancer").
+				WithName(loadBalancer.Name).
+				WithUID(loadBalancer.UID),
+		).
+		WithNetworkRef(
+			v1alpha1.LocalUIDReference{
+				Name: network.Name,
+				UID:  network.UID,
+			}).
+		WithDestinations(destinationApplyConfigs...)
 }
 
 func (o *ironcoreLoadBalancer) getLoadBalancerDestinationsForNodes(ctx context.Context, nodes []*v1.Node, networkName string) ([]networkingv1alpha1.LoadBalancerDestination, error) {
