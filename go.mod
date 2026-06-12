@@ -3,8 +3,8 @@ module github.com/ironcore-dev/cloud-provider-ironcore
 go 1.25.1
 
 require (
-	github.com/ironcore-dev/controller-utils v0.11.1-0.20260521082229-5437e1aa60a3
-	github.com/ironcore-dev/ironcore v0.3.1-0.20260526070152-ddfd5b329c48
+	github.com/ironcore-dev/controller-utils v0.12.0
+	github.com/ironcore-dev/ironcore v0.4.1
 	github.com/onsi/ginkgo/v2 v2.29.0
 	github.com/onsi/gomega v1.41.0
 	github.com/pkg/errors v0.9.1
@@ -16,6 +16,7 @@ require (
 	k8s.io/component-base v0.35.3
 	k8s.io/controller-manager v0.35.3
 	k8s.io/klog/v2 v2.130.1
+	k8s.io/utils v0.0.0-20260108192941-914a6e750570
 	sigs.k8s.io/controller-runtime v0.23.3
 	sigs.k8s.io/yaml v1.6.0
 )
@@ -104,8 +105,8 @@ require (
 	golang.org/x/mod v0.35.0 // indirect
 	golang.org/x/net v0.53.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/sync v0.21.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/term v0.42.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
@@ -124,7 +125,6 @@ require (
 	k8s.io/kms v0.35.3 // indirect
 	k8s.io/kube-aggregator v0.35.3 // indirect
 	k8s.io/kube-openapi v0.0.0-20260127142750-a19766b6e2d4 // indirect
-	k8s.io/utils v0.0.0-20260108192941-914a6e750570 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.33.0 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
