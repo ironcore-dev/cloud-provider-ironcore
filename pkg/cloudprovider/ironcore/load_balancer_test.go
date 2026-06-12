@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/utils/ptr"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	commonv1alpha1 "github.com/ironcore-dev/ironcore/api/common/v1alpha1"
@@ -161,10 +162,12 @@ var _ = Describe("LoadBalancer", func() {
 		}
 		Eventually(Object(lbRouting)).Should(SatisfyAll(
 			HaveField("ObjectMeta.OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion: "networking.ironcore.dev/v1alpha1",
-				Kind:       "LoadBalancer",
-				Name:       loadBalancer.Name,
-				UID:        loadBalancer.UID,
+				APIVersion:         "networking.ironcore.dev/v1alpha1",
+				Kind:               "LoadBalancer",
+				Name:               loadBalancer.Name,
+				UID:                loadBalancer.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Destinations", ContainElements([]networkingv1alpha1.LoadBalancerDestination{
 				{
@@ -334,10 +337,12 @@ var _ = Describe("LoadBalancer", func() {
 		}
 		Eventually(Object(lbRouting)).Should(SatisfyAll(
 			HaveField("ObjectMeta.OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion: "networking.ironcore.dev/v1alpha1",
-				Kind:       "LoadBalancer",
-				Name:       loadBalancer.Name,
-				UID:        loadBalancer.UID,
+				APIVersion:         "networking.ironcore.dev/v1alpha1",
+				Kind:               "LoadBalancer",
+				Name:               loadBalancer.Name,
+				UID:                loadBalancer.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Destinations", ContainElements([]networkingv1alpha1.LoadBalancerDestination{
 				{
@@ -599,10 +604,12 @@ var _ = Describe("LoadBalancer", func() {
 		}
 		Eventually(Object(lbRouting)).Should(SatisfyAll(
 			HaveField("ObjectMeta.OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion: "networking.ironcore.dev/v1alpha1",
-				Kind:       "LoadBalancer",
-				Name:       loadBalancer.Name,
-				UID:        loadBalancer.UID,
+				APIVersion:         "networking.ironcore.dev/v1alpha1",
+				Kind:               "LoadBalancer",
+				Name:               loadBalancer.Name,
+				UID:                loadBalancer.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
 			})),
 			// networkInterfaceFoo will not be listed in destinations, because network "foo" used by
 			// networkInterfaceFoo does not exist
@@ -866,10 +873,12 @@ var _ = Describe("LoadBalancer", func() {
 		}
 		Eventually(Object(lbRouting)).Should(SatisfyAll(
 			HaveField("ObjectMeta.OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion: "networking.ironcore.dev/v1alpha1",
-				Kind:       "LoadBalancer",
-				Name:       loadBalancer.Name,
-				UID:        loadBalancer.UID,
+				APIVersion:         "networking.ironcore.dev/v1alpha1",
+				Kind:               "LoadBalancer",
+				Name:               loadBalancer.Name,
+				UID:                loadBalancer.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Destinations", ContainElements([]networkingv1alpha1.LoadBalancerDestination{
 				{
@@ -916,10 +925,12 @@ var _ = Describe("LoadBalancer", func() {
 		Expect(lbProvider.UpdateLoadBalancer(ctx, clusterName, service, []*corev1.Node{node, node2})).NotTo(HaveOccurred())
 		Eventually(Object(lbRouting)).Should(SatisfyAll(
 			HaveField("ObjectMeta.OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion: "networking.ironcore.dev/v1alpha1",
-				Kind:       "LoadBalancer",
-				Name:       loadBalancer.Name,
-				UID:        loadBalancer.UID,
+				APIVersion:         "networking.ironcore.dev/v1alpha1",
+				Kind:               "LoadBalancer",
+				Name:               loadBalancer.Name,
+				UID:                loadBalancer.UID,
+				Controller:         ptr.To(true),
+				BlockOwnerDeletion: ptr.To(true),
 			})),
 			HaveField("Destinations", ContainElements([]networkingv1alpha1.LoadBalancerDestination{
 				{
