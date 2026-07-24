@@ -1,21 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
 namespace: kube-system
 
 resources:
-  - ../default
-  - ../rbac
+- ../default
+- ../rbac
 
-patchesStrategicMerge:
-  - patch-manager.yaml
+patches:
+- path: patch-manager.yaml
 
 # cluster api + infra is essentially the same environment (kind cluster)
 secretGenerator:
-  - name: kubeconfig
-    files:
-      - kubeconfig
-  - name: cloud-config
-    files:
-      - cloud-config
-  - name: ironcore-kubeconfig
-    files:
-      - ironcore/kubeconfig
-
+- files:
+  - kubeconfig
+  name: kubeconfig
+- files:
+  - cloud-config
+  name: cloud-config
+- files:
+  - ironcore/kubeconfig
+  name: ironcore-kubeconfig
