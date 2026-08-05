@@ -49,7 +49,6 @@ var _ = Describe("InstancesV2", func() {
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
 				MachinePoolRef:  &corev1.LocalObjectReference{Name: machinePool.Name},
-				Image:           "my-image:latest",
 				Volumes:         []computev1alpha1.Volume{},
 			},
 		}
@@ -240,7 +239,6 @@ var _ = Describe("InstancesV2", func() {
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
 				MachinePoolRef:  &corev1.LocalObjectReference{Name: machinePool.Name},
-				Image:           "my-image:latest",
 				Volumes:         []computev1alpha1.Volume{},
 			},
 		}
@@ -334,7 +332,6 @@ var _ = Describe("InstancesV2", func() {
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
 				MachinePoolRef:  &corev1.LocalObjectReference{Name: machinePool.Name},
-				Image:           "my-image:latest",
 				Volumes:         []computev1alpha1.Volume{},
 			},
 		}
@@ -425,7 +422,6 @@ var _ = Describe("InstancesV2", func() {
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
 				MachinePoolRef:  &corev1.LocalObjectReference{Name: machinePool.Name},
-				Image:           "my-image:latest",
 				Volumes:         []computev1alpha1.Volume{},
 			},
 		}

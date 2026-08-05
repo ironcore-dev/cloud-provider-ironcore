@@ -44,7 +44,6 @@ var _ = Describe("LoadBalancer", func() {
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
-				Image:           "my-image:latest",
 				Volumes:         []computev1alpha1.Volume{},
 			},
 		}
@@ -194,7 +193,6 @@ var _ = Describe("LoadBalancer", func() {
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
-				Image:           "my-image:latest",
 				Volumes:         []computev1alpha1.Volume{},
 			},
 		}
@@ -372,7 +370,6 @@ var _ = Describe("LoadBalancer", func() {
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
-				Image:           "my-image:latest",
 				Volumes:         []computev1alpha1.Volume{},
 			},
 		}
@@ -529,7 +526,6 @@ var _ = Describe("LoadBalancer", func() {
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
-				Image:           "my-image:latest",
 				Volumes:         []computev1alpha1.Volume{},
 			},
 		}
@@ -642,7 +638,6 @@ var _ = Describe("LoadBalancer", func() {
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
-				Image:           "my-image:latest",
 				Volumes:         []computev1alpha1.Volume{},
 			},
 		}
@@ -798,7 +793,6 @@ var _ = Describe("LoadBalancer", func() {
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
-				Image:           "my-image:latest",
 				Volumes:         []computev1alpha1.Volume{},
 			},
 		}
@@ -960,7 +954,6 @@ var _ = Describe("LoadBalancer", func() {
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
-				Image:           "my-image:latest",
 				Volumes:         []computev1alpha1.Volume{},
 			},
 		}
