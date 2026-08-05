@@ -136,8 +136,8 @@ func (o *ironcoreLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNa
 	if !o.useNicSelector {
 		loadBalancerToRoute := &networkingv1alpha1.LoadBalancer{}
 		loadBalancerKey := client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancerName}
-		if err := o.ironcoreClient.Get(ctx, loadBalancerKey, loadBalancerToRoute); err != nil {
-			return nil, fmt.Errorf("failed to get LoadBalancer %s for routing: %w", loadBalancerKey, err)
+		if err := getLoadBalancerWithRetry(ctx, o.ironcoreClient, loadBalancerKey, loadBalancerToRoute); err != nil {
+			return nil, err
 		}
 
 		klog.V(2).InfoS("Applying LoadBalancerRouting for LoadBalancer", "LoadBalancer", client.ObjectKeyFromObject(loadBalancerToRoute))
@@ -261,6 +261,28 @@ func (o *ironcoreLoadBalancer) buildLoadBalancerApplyConfig(clusterName string, 
 		}).
 		WithSpec(spec), nil
 }
+
+func getLoadBalancerWithRetry(ctx context.Context, c client.Client, key client.ObjectKey, loadBalancer *networkingv1alpha1.LoadBalancer) error {
+	backoff := wait.Backoff{
+		Duration: waitLoadbalancerInitDelay,
+		Factor:   waitLoadbalancerFactor,
+		Steps:    waitLoadbalancerActiveSteps,
+	}
+
+	if err := wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
+		if err := c.Get(ctx, key, loadBalancer); err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
+	}); err != nil {
+		return fmt.Errorf("failed to get LoadBalancer %s for routing: %w", key, err)
+	}
+	return nil
+}
+
 func waitLoadBalancerActive(ctx context.Context, ironcoreClient client.Client, existingLoadBalancerType networkingv1alpha1.LoadBalancerType,
 	service *v1.Service, loadBalancer *networkingv1alpha1.LoadBalancer) (v1.LoadBalancerStatus, error) {
 	klog.V(2).InfoS("Waiting for LoadBalancer instance to become ready", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
