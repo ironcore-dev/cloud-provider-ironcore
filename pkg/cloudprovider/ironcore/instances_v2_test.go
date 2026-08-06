@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	cloudprovider "k8s.io/cloud-provider"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -24,6 +25,7 @@ var _ = Describe("InstancesV2", func() {
 		instancesProvider cloudprovider.InstancesV2
 	)
 	ns, cp, network, clusterName := SetupTest()
+	localDiskSize := resource.MustParse("10Gi")
 
 	It("should get instance info", func(ctx SpecContext) {
 		By("instantiating the instances v2 provider")
@@ -49,7 +51,17 @@ var _ = Describe("InstancesV2", func() {
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
 				MachinePoolRef:  &corev1.LocalObjectReference{Name: machinePool.Name},
-				Volumes:         []computev1alpha1.Volume{},
+				Volumes: []computev1alpha1.Volume{
+					{
+						Name: "primary",
+						VolumeSource: computev1alpha1.VolumeSource{
+							LocalDisk: &computev1alpha1.LocalDiskVolumeSource{
+								SizeLimit: &localDiskSize,
+								Image:     "sample-image",
+							},
+						},
+					},
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
@@ -239,7 +251,17 @@ var _ = Describe("InstancesV2", func() {
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
 				MachinePoolRef:  &corev1.LocalObjectReference{Name: machinePool.Name},
-				Volumes:         []computev1alpha1.Volume{},
+				Volumes: []computev1alpha1.Volume{
+					{
+						Name: "primary",
+						VolumeSource: computev1alpha1.VolumeSource{
+							LocalDisk: &computev1alpha1.LocalDiskVolumeSource{
+								SizeLimit: &localDiskSize,
+								Image:     "sample-image",
+							},
+						},
+					},
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
@@ -332,7 +354,17 @@ var _ = Describe("InstancesV2", func() {
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
 				MachinePoolRef:  &corev1.LocalObjectReference{Name: machinePool.Name},
-				Volumes:         []computev1alpha1.Volume{},
+				Volumes: []computev1alpha1.Volume{
+					{
+						Name: "primary",
+						VolumeSource: computev1alpha1.VolumeSource{
+							LocalDisk: &computev1alpha1.LocalDiskVolumeSource{
+								SizeLimit: &localDiskSize,
+								Image:     "sample-image",
+							},
+						},
+					},
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
@@ -422,7 +454,17 @@ var _ = Describe("InstancesV2", func() {
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
 				MachinePoolRef:  &corev1.LocalObjectReference{Name: machinePool.Name},
-				Volumes:         []computev1alpha1.Volume{},
+				Volumes: []computev1alpha1.Volume{
+					{
+						Name: "primary",
+						VolumeSource: computev1alpha1.VolumeSource{
+							LocalDisk: &computev1alpha1.LocalDiskVolumeSource{
+								SizeLimit: &localDiskSize,
+								Image:     "sample-image",
+							},
+						},
+					},
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())

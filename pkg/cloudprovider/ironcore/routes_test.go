@@ -13,6 +13,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
@@ -28,6 +29,7 @@ var _ = Describe("Routes", func() {
 		machine        *computev1alpha1.Machine
 		node           *corev1.Node
 	)
+	localDiskSize := resource.MustParse("10Gi")
 
 	BeforeEach(func(ctx SpecContext) {
 		By("setting the routes provider")
@@ -43,7 +45,17 @@ var _ = Describe("Routes", func() {
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
-				Volumes:         []computev1alpha1.Volume{},
+				Volumes: []computev1alpha1.Volume{
+					{
+						Name: "primary",
+						VolumeSource: computev1alpha1.VolumeSource{
+							LocalDisk: &computev1alpha1.LocalDiskVolumeSource{
+								SizeLimit: &localDiskSize,
+								Image:     "sample-image",
+							},
+						},
+					},
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
