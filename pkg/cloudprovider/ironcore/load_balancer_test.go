@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	cloudprovider "k8s.io/cloud-provider"
@@ -27,6 +28,7 @@ var _ = Describe("LoadBalancer", func() {
 	var (
 		lbProvider cloudprovider.LoadBalancer
 	)
+	localDiskSize := resource.MustParse("10Gi")
 
 	BeforeEach(func(ctx SpecContext) {
 		By("instantiating the load balancer provider")
@@ -44,8 +46,17 @@ var _ = Describe("LoadBalancer", func() {
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
-				Image:           "my-image:latest",
-				Volumes:         []computev1alpha1.Volume{},
+				Volumes: []computev1alpha1.Volume{
+					{
+						Name: "primary",
+						VolumeSource: computev1alpha1.VolumeSource{
+							LocalDisk: &computev1alpha1.LocalDiskVolumeSource{
+								SizeLimit: &localDiskSize,
+								Image:     "sample-image",
+							},
+						},
+					},
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
@@ -146,8 +157,10 @@ var _ = Describe("LoadBalancer", func() {
 		}()
 
 		By("ensuring load balancer for service")
-		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().ToNot(HaveOccurred())
-
+		Eventually(func(g Gomega) {
+			_, err := lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})
+			g.Expect(err).NotTo(HaveOccurred())
+		}).Should(Succeed())
 		By("ensuring the load balancer type is public and load balancer status has public IP")
 		Eventually(Object(loadBalancer)).Should(SatisfyAll(
 			HaveField("Spec.Type", Equal(networkingv1alpha1.LoadBalancerTypePublic)),
@@ -194,8 +207,17 @@ var _ = Describe("LoadBalancer", func() {
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
-				Image:           "my-image:latest",
-				Volumes:         []computev1alpha1.Volume{},
+				Volumes: []computev1alpha1.Volume{
+					{
+						Name: "primary",
+						VolumeSource: computev1alpha1.VolumeSource{
+							LocalDisk: &computev1alpha1.LocalDiskVolumeSource{
+								SizeLimit: &localDiskSize,
+								Image:     "sample-image",
+							},
+						},
+					},
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
@@ -299,7 +321,10 @@ var _ = Describe("LoadBalancer", func() {
 		}()
 
 		By("ensuring load balancer for service")
-		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().ToNot(HaveOccurred())
+		Eventually(func(g Gomega) {
+			_, err := lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})
+			g.Expect(err).NotTo(HaveOccurred())
+		}).Should(Succeed())
 
 		By("ensuring the load balancer type is internal and load balancer status has internal IP")
 		Eventually(Object(loadBalancer)).Should(SatisfyAll(
@@ -321,7 +346,10 @@ var _ = Describe("LoadBalancer", func() {
 		}()
 
 		By("ensuring load balancer for service")
-		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().ToNot(HaveOccurred())
+		Eventually(func(g Gomega) {
+			_, err := lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})
+			g.Expect(err).NotTo(HaveOccurred())
+		}).Should(Succeed())
 
 		By("ensuring the load balancer type is public and load balancer status has public IP")
 		Eventually(Object(loadBalancer)).Should(SatisfyAll(
@@ -372,8 +400,17 @@ var _ = Describe("LoadBalancer", func() {
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
-				Image:           "my-image:latest",
-				Volumes:         []computev1alpha1.Volume{},
+				Volumes: []computev1alpha1.Volume{
+					{
+						Name: "primary",
+						VolumeSource: computev1alpha1.VolumeSource{
+							LocalDisk: &computev1alpha1.LocalDiskVolumeSource{
+								SizeLimit: &localDiskSize,
+								Image:     "sample-image",
+							},
+						},
+					},
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
@@ -514,8 +551,10 @@ var _ = Describe("LoadBalancer", func() {
 		}()
 
 		By("ensuring load balancer for service")
-		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().ToNot(HaveOccurred())
-
+		Eventually(func(g Gomega) {
+			_, err := lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})
+			g.Expect(err).NotTo(HaveOccurred())
+		}).Should(Succeed())
 		By("ensuring the load balancer type is public and load balancer status has public IP")
 		Eventually(Object(loadBalancer)).Should(SatisfyAll(
 			HaveField("Spec.Type", Equal(networkingv1alpha1.LoadBalancerTypePublic)),
@@ -529,8 +568,17 @@ var _ = Describe("LoadBalancer", func() {
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
-				Image:           "my-image:latest",
-				Volumes:         []computev1alpha1.Volume{},
+				Volumes: []computev1alpha1.Volume{
+					{
+						Name: "primary",
+						VolumeSource: computev1alpha1.VolumeSource{
+							LocalDisk: &computev1alpha1.LocalDiskVolumeSource{
+								SizeLimit: &localDiskSize,
+								Image:     "sample-image",
+							},
+						},
+					},
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, machine2)).To(Succeed())
@@ -642,8 +690,17 @@ var _ = Describe("LoadBalancer", func() {
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
-				Image:           "my-image:latest",
-				Volumes:         []computev1alpha1.Volume{},
+				Volumes: []computev1alpha1.Volume{
+					{
+						Name: "primary",
+						VolumeSource: computev1alpha1.VolumeSource{
+							LocalDisk: &computev1alpha1.LocalDiskVolumeSource{
+								SizeLimit: &localDiskSize,
+								Image:     "sample-image",
+							},
+						},
+					},
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
@@ -783,8 +840,10 @@ var _ = Describe("LoadBalancer", func() {
 		}()
 
 		By("ensuring load balancer for service")
-		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().ToNot(HaveOccurred())
-
+		Eventually(func(g Gomega) {
+			_, err := lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})
+			g.Expect(err).NotTo(HaveOccurred())
+		}).Should(Succeed())
 		By("ensuring the load balancer type is public and load balancer status has public IP")
 		Eventually(Object(loadBalancer)).Should(SatisfyAll(
 			HaveField("Spec.Type", Equal(networkingv1alpha1.LoadBalancerTypePublic)),
@@ -798,8 +857,17 @@ var _ = Describe("LoadBalancer", func() {
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
-				Image:           "my-image:latest",
-				Volumes:         []computev1alpha1.Volume{},
+				Volumes: []computev1alpha1.Volume{
+					{
+						Name: "primary",
+						VolumeSource: computev1alpha1.VolumeSource{
+							LocalDisk: &computev1alpha1.LocalDiskVolumeSource{
+								SizeLimit: &localDiskSize,
+								Image:     "sample-image",
+							},
+						},
+					},
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, machine2)).To(Succeed())
@@ -960,8 +1028,17 @@ var _ = Describe("LoadBalancer", func() {
 			},
 			Spec: computev1alpha1.MachineSpec{
 				MachineClassRef: corev1.LocalObjectReference{Name: "machine-class"},
-				Image:           "my-image:latest",
-				Volumes:         []computev1alpha1.Volume{},
+				Volumes: []computev1alpha1.Volume{
+					{
+						Name: "primary",
+						VolumeSource: computev1alpha1.VolumeSource{
+							LocalDisk: &computev1alpha1.LocalDiskVolumeSource{
+								SizeLimit: &localDiskSize,
+								Image:     "sample-image",
+							},
+						},
+					},
+				},
 			},
 		}
 		Expect(k8sClient.Create(ctx, machine)).To(Succeed())
@@ -1092,8 +1169,10 @@ var _ = Describe("LoadBalancer", func() {
 		}()
 
 		By("ensuring load balancer for service")
-		Expect(lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})).Error().ToNot(HaveOccurred())
-
+		Eventually(func(g Gomega) {
+			_, err := lbProvider.EnsureLoadBalancer(ctx, clusterName, service, []*corev1.Node{node})
+			g.Expect(err).NotTo(HaveOccurred())
+		}).Should(Succeed())
 		By("ensuring the load balancer type is public and load balancer status has public IP")
 		Eventually(Object(loadBalancer)).Should(SatisfyAll(
 			HaveField("ObjectMeta.Name", Equal(lbName)),

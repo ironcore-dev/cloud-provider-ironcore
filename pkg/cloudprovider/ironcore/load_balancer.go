@@ -261,6 +261,7 @@ func (o *ironcoreLoadBalancer) buildLoadBalancerApplyConfig(clusterName string, 
 		}).
 		WithSpec(spec), nil
 }
+
 func waitLoadBalancerActive(ctx context.Context, ironcoreClient client.Client, existingLoadBalancerType networkingv1alpha1.LoadBalancerType,
 	service *v1.Service, loadBalancer *networkingv1alpha1.LoadBalancer) (v1.LoadBalancerStatus, error) {
 	klog.V(2).InfoS("Waiting for LoadBalancer instance to become ready", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
