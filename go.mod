@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/ironcore-dev/controller-utils v0.13.0
 	github.com/ironcore-dev/ironcore v0.5.1-0.20260804090802-d4dab327b377
-	github.com/onsi/ginkgo/v2 v2.32.0
+	github.com/onsi/ginkgo/v2 v2.32.1
 	github.com/onsi/gomega v1.42.1
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/pflag v1.0.10
