@@ -411,8 +411,22 @@ var _ = Describe("Routes", func() {
 		}
 		Expect(k8sClient.Patch(ctx, machine, client.MergeFrom(machineBase))).To(Succeed())
 
+		createRouteAndGetPrefixes := func(networkInterface *networkingv1alpha1.NetworkInterface, route *cloudprovider.Route) func() ([]networkingv1alpha1.PrefixSource, error) {
+			return func() ([]networkingv1alpha1.PrefixSource, error) {
+				if err := routesProvider.CreateRoute(ctx, clusterName, route.Name, route); err != nil {
+					return nil, err
+				}
+
+				current := &networkingv1alpha1.NetworkInterface{}
+				if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(networkInterface), current); err != nil {
+					return nil, err
+				}
+				return current.Spec.Prefixes, nil
+			}
+		}
+
 		By("ensuring that the route is represented by a prefix in the static network interface spec")
-		Expect(routesProvider.CreateRoute(ctx, clusterName, "my-route1", &cloudprovider.Route{
+		staticRoute := &cloudprovider.Route{
 			Name:            "foo",
 			TargetNode:      types.NodeName(node.Name),
 			DestinationCIDR: "100.0.0.1/24",
@@ -422,16 +436,14 @@ var _ = Describe("Routes", func() {
 					Address: "100.0.0.1",
 				},
 			},
-		})).To(Succeed())
+		}
 
-		Eventually(Object(staticNetworkInterface)).Should(SatisfyAll(
-			HaveField("Spec.Prefixes", ContainElement(networkingv1alpha1.PrefixSource{
-				Value: commonv1alpha1.MustParseNewIPPrefix("100.0.0.1/24"),
-			})),
-		))
+		Eventually(createRouteAndGetPrefixes(staticNetworkInterface, staticRoute)).Should(ContainElement(networkingv1alpha1.PrefixSource{
+			Value: commonv1alpha1.MustParseNewIPPrefix("100.0.0.1/24"),
+		}))
 
 		By("ensuring that the route is represented by a prefix in the ephemeral network interface spec")
-		Expect(routesProvider.CreateRoute(ctx, clusterName, "my-route2", &cloudprovider.Route{
+		ephemeralRoute := &cloudprovider.Route{
 			Name:            "bar",
 			TargetNode:      types.NodeName(node.Name),
 			DestinationCIDR: "192.168.0.1/32",
@@ -441,13 +453,11 @@ var _ = Describe("Routes", func() {
 					Address: "192.168.0.1",
 				},
 			},
-		})).To(Succeed())
+		}
 
-		Eventually(Object(ephemeralNetworkInterface)).Should(SatisfyAll(
-			HaveField("Spec.Prefixes", ContainElement(networkingv1alpha1.PrefixSource{
-				Value: commonv1alpha1.MustParseNewIPPrefix("192.168.0.1/32"),
-			})),
-		))
+		Eventually(createRouteAndGetPrefixes(ephemeralNetworkInterface, ephemeralRoute)).Should(ContainElement(networkingv1alpha1.PrefixSource{
+			Value: commonv1alpha1.MustParseNewIPPrefix("192.168.0.1/32"),
+		}))
 
 		By("deleting prefix for static route")
 		Expect(routesProvider.DeleteRoute(ctx, clusterName, &cloudprovider.Route{
