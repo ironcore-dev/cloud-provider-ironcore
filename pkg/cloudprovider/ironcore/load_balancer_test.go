@@ -4,6 +4,7 @@
 package ironcore
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider/api"
 	"k8s.io/utils/ptr"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
@@ -1206,5 +1208,62 @@ var _ = Describe("LoadBalancer", func() {
 		_, exist, err := lbProvider.GetLoadBalancer(ctx, "foo", &corev1.Service{})
 		Expect(err).To(HaveOccurred())
 		Expect(exist).To(BeFalse())
+	})
+
+	It("should correctly reconcile an internal load balancer", func(ctx SpecContext) {
+		By("creating a service of type internal load balancer")
+		service := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "service-",
+				Namespace:    ns.Name,
+				Annotations: map[string]string{
+					InternalLoadBalancerAnnotation: "true",
+				},
+			},
+			Spec: corev1.ServiceSpec{
+				Type: corev1.ServiceTypeLoadBalancer,
+				Ports: []corev1.ServicePort{
+					{
+						Name:       "https",
+						Protocol:   "TCP",
+						Port:       443,
+						TargetPort: intstr.IntOrString{IntVal: 443},
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, service)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, service)
+
+		By("Asserting the load balancer cannot be ensured")
+		Consistently(func() error {
+			_, err := lbProvider.EnsureLoadBalancer(ctx, clusterName, service, nil)
+			return err
+		}).Should(Satisfy(func(err error) bool {
+			_, ok := errors.AsType[*api.RetryError](err)
+			return ok
+		}), "No retry error returned")
+
+		By("getting the corresponding load balancer")
+		loadBalancer := &networkingv1alpha1.LoadBalancer{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      lbProvider.GetLoadBalancerName(ctx, clusterName, service),
+			},
+		}
+		Eventually(Get(loadBalancer)).Should(Succeed(), "load balancer was not created")
+
+		By("patching the load balancer to have an allocated IP")
+		Eventually(UpdateStatus(loadBalancer, func() {
+			loadBalancer.Status.IPs = []commonv1alpha1.IP{commonv1alpha1.MustParseIP("10.0.0.1")}
+		})).Should(Succeed())
+
+		By("ensuring the load balancer to report the allocated IP")
+		status, err := lbProvider.EnsureLoadBalancer(ctx, clusterName, service, nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(status.Ingress).To(ConsistOf(corev1.LoadBalancerIngress{IP: "10.0.0.1"}))
+
+		By("deleting the load balancer")
+		Expect(lbProvider.EnsureLoadBalancerDeleted(ctx, clusterName, service)).To(Succeed())
 	})
 })
