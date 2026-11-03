@@ -6,6 +6,8 @@ package ironcore
 import (
 	"context"
 	"fmt"
+	"net/netip"
+	"slices"
 	"strings"
 	"time"
 
@@ -14,7 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
-	servicehelper "k8s.io/cloud-provider/service/helpers"
+	"k8s.io/cloud-provider/api"
 	"k8s.io/klog/v2"
 
 	ipamv1alpha1ac "github.com/ironcore-dev/ironcore/client-go/applyconfigurations/ipam/v1alpha1"
@@ -103,19 +105,21 @@ func (o *ironcoreLoadBalancer) GetLoadBalancerName(ctx context.Context, clusterN
 	return lbName
 }
 
-func (o *ironcoreLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-	klog.V(2).InfoS("EnsureLoadBalancer for Service", "Cluster", clusterName, "Service", client.ObjectKeyFromObject(service))
-
+func (o *ironcoreLoadBalancer) applyLoadBalancer(
+	ctx context.Context,
+	clusterName string,
+	service *v1.Service,
+) (*networkingv1alpha1.LoadBalancer, error) {
 	desiredLoadBalancerType := o.getDesiredLoadBalancerType(service)
 
 	loadBalancerName, err := o.getLoadBalancerName(ctx, clusterName, service)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get LoadBalancer name for Service %s: %w", client.ObjectKeyFromObject(service), err)
+		return nil, fmt.Errorf("getting load balancer name for service %s: %w",
+			client.ObjectKeyFromObject(service), err)
 	}
 
-	existingLoadBalancerType, err := o.ensureLoadBalancerType(ctx, clusterName, service, loadBalancerName, desiredLoadBalancerType)
-	if err != nil {
-		return nil, err
+	if err := o.cleanupOutdatedLoadBalancerIfExists(ctx, loadBalancerName, desiredLoadBalancerType); err != nil {
+		return nil, fmt.Errorf("cleaning up outdated load balancer: %w", err)
 	}
 
 	loadBalancerApplyConfig, err := o.buildLoadBalancerApplyConfig(clusterName, service, loadBalancerName, desiredLoadBalancerType)
@@ -123,44 +127,67 @@ func (o *ironcoreLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterNa
 		return nil, err
 	}
 
-	klog.V(2).InfoS("Applying LoadBalancer for Service", "LoadBalancer", client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancerName}, "Service", client.ObjectKeyFromObject(service))
+	klog.V(2).InfoS("Applying LoadBalancer for Service",
+		"loadBalancerName", loadBalancerName,
+		"Service", klog.KObj(service),
+	)
 
-	if err := o.ironcoreClient.Apply(ctx, loadBalancerApplyConfig, client.FieldOwner(loadBalancerFieldOwner), client.ForceOwnership); err != nil {
-		return nil, fmt.Errorf("failed to apply LoadBalancer %s for Service %s: %w", client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancerName}, client.ObjectKeyFromObject(service), err)
+	if err := o.ironcoreClient.Apply(ctx, loadBalancerApplyConfig, loadBalancerFieldOwner, client.ForceOwnership); err != nil {
+		return nil, fmt.Errorf("applying load balancer %s for service %s: %w",
+			loadBalancerName, client.ObjectKeyFromObject(service), err)
 	}
 
-	klog.V(2).InfoS("Applied LoadBalancer for Service", "LoadBalancer", client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancerName}, "Service", client.ObjectKeyFromObject(service))
+	klog.V(2).InfoS("Applied LoadBalancer for Service",
+		"loadBalancerName", loadBalancerName,
+		"Service", klog.KObj(service),
+	)
+
+	loadBalancer := &networkingv1alpha1.LoadBalancer{}
+	loadBalancerKey := client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancerName}
+	if err := o.ironcoreClient.Get(ctx, loadBalancerKey, loadBalancer); err != nil {
+		return nil, fmt.Errorf("getting load balancer %s: %w", loadBalancerName, err)
+	}
+	return loadBalancer, nil
+}
+
+func loadBalancerStatusFromLoadBalancer(loadBalancer *networkingv1alpha1.LoadBalancer) *v1.LoadBalancerStatus {
+	var lbIngress []v1.LoadBalancerIngress
+	for _, ipAddr := range loadBalancer.Status.IPs {
+		lbIngress = append(lbIngress, v1.LoadBalancerIngress{IP: ipAddr.String()})
+	}
+	return &v1.LoadBalancerStatus{
+		Ingress: lbIngress,
+	}
+}
+
+func (o *ironcoreLoadBalancer) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
+	klog.V(2).InfoS("EnsureLoadBalancer for Service", "Cluster", clusterName, "Service", client.ObjectKeyFromObject(service))
+
+	loadBalancer, err := o.applyLoadBalancer(ctx, clusterName, service)
+	if err != nil {
+		return nil, fmt.Errorf("applying load balancer: %w", err)
+	}
 
 	// if useNicSelector is set to false then cloudProvider has to create the loadbalancerRouting
 	// if useNicSelector is set to true then Ironcore will take care of creating the loadbalancerRouting
 	if !o.useNicSelector {
-		loadBalancerToRoute := &networkingv1alpha1.LoadBalancer{}
-		loadBalancerKey := client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancerName}
-		if err := o.ironcoreClient.Get(ctx, loadBalancerKey, loadBalancerToRoute); err != nil {
-			return nil, fmt.Errorf("failed to get LoadBalancer %s for routing: %w", loadBalancerKey, err)
-		}
-
-		klog.V(2).InfoS("Applying LoadBalancerRouting for LoadBalancer", "LoadBalancer", client.ObjectKeyFromObject(loadBalancerToRoute))
-
-		if err := o.applyLoadBalancerRoutingForLoadBalancer(ctx, loadBalancerToRoute, nodes); err != nil {
+		if err := o.applyLoadBalancerRoutingForLoadBalancer(ctx, loadBalancer, nodes); err != nil {
 			return nil, err
 		}
 
-		klog.V(2).InfoS("Applied LoadBalancerRouting for LoadBalancer", "LoadBalancer", client.ObjectKeyFromObject(loadBalancerToRoute))
+		klog.V(2).InfoS("Applied LoadBalancerRouting for LoadBalancer",
+			"loadBalancer", klog.KObj(loadBalancer))
 	}
 
-	loadBalancer := &networkingv1alpha1.LoadBalancer{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      loadBalancerName,
-			Namespace: o.ironcoreNamespace,
-		},
-	}
-
-	lbStatus, err := waitLoadBalancerActive(ctx, o.ironcoreClient, existingLoadBalancerType, service, loadBalancer)
+	active, err := o.isLoadBalancerActive(loadBalancer)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("checking if load balancer is active: %w", err)
 	}
-	return &lbStatus, nil
+	if !active {
+		klog.V(2).InfoS("Load balancer is not yet active", "loadBalancer", klog.KObj(loadBalancer))
+		return nil, api.NewRetryError(fmt.Sprintf("load balancer %s is not yet active", loadBalancer.Name), waitLoadbalancerInitDelay)
+	}
+	return loadBalancerStatusFromLoadBalancer(loadBalancer), nil
 }
 
 func (o *ironcoreLoadBalancer) getDesiredLoadBalancerType(service *v1.Service) networkingv1alpha1.LoadBalancerType {
@@ -171,31 +198,36 @@ func (o *ironcoreLoadBalancer) getDesiredLoadBalancerType(service *v1.Service) n
 	return networkingv1alpha1.LoadBalancerTypePublic
 }
 
-func (o *ironcoreLoadBalancer) ensureLoadBalancerType(ctx context.Context, clusterName string, service *v1.Service, loadBalancerName string,
+func (o *ironcoreLoadBalancer) cleanupOutdatedLoadBalancerIfExists(
+	ctx context.Context,
+	loadBalancerName string,
 	desiredType networkingv1alpha1.LoadBalancerType,
-) (networkingv1alpha1.LoadBalancerType, error) {
-	existingLoadBalancer := &networkingv1alpha1.LoadBalancer{}
-
-	if err := o.ironcoreClient.Get(ctx, client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancerName}, existingLoadBalancer); err != nil {
+) error {
+	loadBalancer := &networkingv1alpha1.LoadBalancer{}
+	loadBalancerKey := client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancerName}
+	if err := o.ironcoreClient.Get(ctx, loadBalancerKey, loadBalancer); err != nil {
 		if apierrors.IsNotFound(err) {
-			return "", nil
+			return nil
 		}
 
-		return "", err
+		return err
 	}
 
-	existingType := existingLoadBalancer.Spec.Type
+	existingType := loadBalancer.Spec.Type
 
 	if existingType != desiredType {
-		if err := o.EnsureLoadBalancerDeleted(ctx, clusterName, service); err != nil {
-			return "", fmt.Errorf("failed deleting existing loadbalancer %s: %w", loadBalancerName, err)
+		if err := o.ensureLoadBalancerDeleted(ctx, loadBalancerName); err != nil {
+			return fmt.Errorf("deleting mismatching load balancer %s: %w", loadBalancerKey, err)
 		}
 	}
 
-	return existingType, nil
+	return nil
 }
 
-func (o *ironcoreLoadBalancer) buildLoadBalancerApplyConfig(clusterName string, service *v1.Service, loadBalancerName string,
+func (o *ironcoreLoadBalancer) buildLoadBalancerApplyConfig(
+	clusterName string,
+	service *v1.Service,
+	loadBalancerName string,
 	loadBalancerType networkingv1alpha1.LoadBalancerType,
 ) (*networkingv1alpha1ac.LoadBalancerApplyConfiguration, error) {
 	lbPorts := make([]*networkingv1alpha1ac.LoadBalancerPortApplyConfiguration, 0, len(service.Spec.Ports))
@@ -262,39 +294,56 @@ func (o *ironcoreLoadBalancer) buildLoadBalancerApplyConfig(clusterName string, 
 		WithSpec(spec), nil
 }
 
-func waitLoadBalancerActive(ctx context.Context, ironcoreClient client.Client, existingLoadBalancerType networkingv1alpha1.LoadBalancerType,
-	service *v1.Service, loadBalancer *networkingv1alpha1.LoadBalancer) (v1.LoadBalancerStatus, error) {
-	klog.V(2).InfoS("Waiting for LoadBalancer instance to become ready", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
-	backoff := wait.Backoff{
-		Duration: waitLoadbalancerInitDelay,
-		Factor:   waitLoadbalancerFactor,
-		Steps:    waitLoadbalancerActiveSteps,
+func (o *ironcoreLoadBalancer) isLoadBalancerActive(
+	loadBalancer *networkingv1alpha1.LoadBalancer,
+) (bool, error) {
+	if len(loadBalancer.Status.IPs) == 0 {
+		return false, nil
 	}
 
-	loadBalancerStatus := v1.LoadBalancerStatus{}
-	if err := wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
-		if err := ironcoreClient.Get(ctx, client.ObjectKey{Namespace: loadBalancer.Namespace, Name: loadBalancer.Name}, loadBalancer); err != nil {
-			return false, err
-		}
-		if len(loadBalancer.Status.IPs) == 0 {
-			return false, nil
-		}
-		lbIngress := []v1.LoadBalancerIngress{}
-		for _, ipAddr := range loadBalancer.Status.IPs {
-			lbIngress = append(lbIngress, v1.LoadBalancerIngress{IP: ipAddr.String()})
-		}
-		loadBalancerStatus.Ingress = lbIngress
-
-		if loadBalancer.Spec.Type != existingLoadBalancerType && servicehelper.LoadBalancerStatusEqual(&service.Status.LoadBalancer, &loadBalancerStatus) {
-			return false, nil
-		}
-		return true, nil
-	}); wait.Interrupted(err) {
-		return loadBalancerStatus, fmt.Errorf("timeout waiting for the LoadBalancer %s to become ready", client.ObjectKeyFromObject(loadBalancer))
+	ipRequests := make([]netip.Prefix, 0, len(loadBalancer.Status.IPs))
+	ipFamilyToRequest := map[v1.IPFamily]netip.Prefix{
+		v1.IPv4Protocol: netip.PrefixFrom(netip.IPv4Unspecified(), 0),
+		v1.IPv6Protocol: netip.PrefixFrom(netip.IPv6Unspecified(), 0),
 	}
 
-	klog.V(2).InfoS("LoadBalancer became ready", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
-	return loadBalancerStatus, nil
+	switch loadBalancer.Spec.Type {
+	case networkingv1alpha1.LoadBalancerTypePublic:
+		for _, ipFamily := range loadBalancer.Spec.IPFamilies {
+			ipRequests = append(ipRequests, ipFamilyToRequest[ipFamily])
+		}
+	case networkingv1alpha1.LoadBalancerTypeInternal:
+		for _, ipSrc := range loadBalancer.Spec.IPs {
+			switch {
+			case ipSrc.Value != nil:
+				ip := ipSrc.Value
+				ipRequests = append(ipRequests, netip.PrefixFrom(ip.Addr, ip.BitLen()))
+			case ipSrc.Ephemeral != nil:
+				prefixSpec := ipSrc.Ephemeral.PrefixTemplate.Spec
+				ipRequests = append(ipRequests, ipFamilyToRequest[prefixSpec.IPFamily])
+			}
+		}
+	}
+
+	// Sort descending, higher specificity over lower
+	slices.SortFunc(ipRequests, func(a, b netip.Prefix) int { return -a.Compare(b) })
+
+	unmatched := make(map[netip.Addr]struct{}, len(loadBalancer.Status.IPs))
+	for _, ip := range loadBalancer.Status.IPs {
+		unmatched[ip.Addr] = struct{}{}
+	}
+
+Loop:
+	for _, request := range ipRequests {
+		for ip := range unmatched {
+			if request.Contains(ip) {
+				delete(unmatched, ip)
+				continue Loop
+			}
+		}
+		return false, nil
+	}
+	return true, nil
 }
 
 func (o *ironcoreLoadBalancer) applyLoadBalancerRoutingForLoadBalancer(ctx context.Context, loadBalancer *networkingv1alpha1.LoadBalancer, nodes []*v1.Node) error {
@@ -456,49 +505,58 @@ func (o *ironcoreLoadBalancer) UpdateLoadBalancer(ctx context.Context, clusterNa
 	return nil
 }
 
-func (o *ironcoreLoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
-	loadBalancerName, err := o.getLoadBalancerName(ctx, clusterName, service)
-	if err != nil {
-		return fmt.Errorf("failed to get LoadBalancer name for Service %s: %w", client.ObjectKeyFromObject(service), err)
-	}
-
+func (o *ironcoreLoadBalancer) ensureLoadBalancerDeleted(ctx context.Context, loadBalancerName string) error {
 	loadBalancer := &networkingv1alpha1.LoadBalancer{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: o.ironcoreNamespace,
 			Name:      loadBalancerName,
 		},
 	}
-	klog.V(2).InfoS("Deleting LoadBalancer", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
+	klog.V(2).InfoS("Deleting LoadBalancer", "loadBalancer", loadBalancerName)
 	if err := o.ironcoreClient.Delete(ctx, loadBalancer); err != nil {
 		if apierrors.IsNotFound(err) {
-			klog.V(2).InfoS("LoadBalancer is already gone", client.ObjectKeyFromObject(loadBalancer))
+			klog.V(2).InfoS("LoadBalancer is already gone", "loadBalancerName", loadBalancerName)
 			return nil
 		}
-		return fmt.Errorf("failed to delete loadbalancer %s: %w", client.ObjectKeyFromObject(loadBalancer), err)
+		return fmt.Errorf("deleting loadbalancer %s: %w", loadBalancerName, err)
 	}
-	if err := waitForDeletingLoadBalancer(ctx, service, o.ironcoreClient, loadBalancer); err != nil {
-		return err
-	}
-	return nil
+	return o.waitForLoadBalancerToBeDeleted(ctx, loadBalancerName)
 }
 
-func waitForDeletingLoadBalancer(ctx context.Context, service *v1.Service, ironcoreClient client.Client, loadBalancer *networkingv1alpha1.LoadBalancer) error {
-	klog.V(2).InfoS("Waiting for LoadBalancer instance to be deleted", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
+func (o *ironcoreLoadBalancer) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
+	loadBalancerName, err := o.getLoadBalancerName(ctx, clusterName, service)
+	if err != nil {
+		return fmt.Errorf("failed to get LoadBalancer name for Service %s: %w", client.ObjectKeyFromObject(service), err)
+	}
+
+	return o.ensureLoadBalancerDeleted(ctx, loadBalancerName)
+}
+
+func (o *ironcoreLoadBalancer) waitForLoadBalancerToBeDeleted(
+	ctx context.Context,
+	loadBalancerName string,
+) error {
+	klog.V(2).InfoS("Waiting for LoadBalancer instance to be deleted", "loadBalancerName", loadBalancerName)
 	backoff := wait.Backoff{
 		Duration: waitLoadbalancerInitDelay,
 		Factor:   waitLoadbalancerFactor,
 		Steps:    waitLoadbalancerActiveSteps,
 	}
 
+	loadBalancer := &networkingv1alpha1.LoadBalancer{}
+	loadBalancerKey := client.ObjectKey{Namespace: o.ironcoreNamespace, Name: loadBalancerName}
 	if err := wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
-		if err := ironcoreClient.Get(ctx, client.ObjectKey{Namespace: loadBalancer.Namespace, Name: loadBalancer.Name}, loadBalancer); !apierrors.IsNotFound(err) {
-			return false, err
+		if err := o.ironcoreClient.Get(ctx, loadBalancerKey, loadBalancer); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return false, fmt.Errorf("getting load balancer %s: %w", loadBalancerName, err)
+			}
+			return true, nil
 		}
-		return true, nil
-	}); wait.Interrupted(err) {
-		return fmt.Errorf("timeout waiting for the LoadBalancer %s to be deleted", client.ObjectKeyFromObject(loadBalancer))
+		return false, nil
+	}); err != nil {
+		return fmt.Errorf("waiting for the load balancer %s to be deleted: %w", loadBalancerName, err)
 	}
 
-	klog.V(2).InfoS("Deleted LoadBalancer", "LoadBalancer", client.ObjectKeyFromObject(loadBalancer))
+	klog.V(2).InfoS("Deleted LoadBalancer", "loadBalancer", loadBalancerName)
 	return nil
 }
